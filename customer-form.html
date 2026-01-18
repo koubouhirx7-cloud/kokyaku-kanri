@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お客様情報入力 - NextCore CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Noto+Sans+JP:wght@400;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #4f46e5;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+            margin-top: 20px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        p.desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .form-card {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .success-msg {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-msg h3 {
+            color: #10b981;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="entry-form-container">
+            <header>
+                <h2>お客様情報入力</h2>
+                <p class="desc">ご来店ありがとうございます。お名前と連絡先のご入力をお願いいたします。</p>
+            </header>
+
+            <div class="form-card">
+                <form id="customer-self-form">
+                    <div class="form-group">
+                        <label>お名前 (フルネーム)</label>
+                        <input type="text" name="name" placeholder="山田 太郎" required>
+                    </div>
+                    <div class="form-group">
+                        <label>お名前 (フリガナ)</label>
+                        <input type="text" name="kana" placeholder="ヤマダ タロウ">
+                    </div>
+                    <div class="form-group">
+                        <label>電話番号</label>
+                        <input type="tel" name="phone" placeholder="090-0000-0000" required>
+                    </div>
+                    <div class="form-group">
+                        <label>メールアドレス</label>
+                        <input type="email" name="email" placeholder="example@mail.com">
+                    </div>
+                    <div class="form-group">
+                        <label>LINE ID (任意)</label>
+                        <input type="text" name="lineId" placeholder="@id">
+                    </div>
+                    <div class="form-group">
+                        <label>ご用件・備考</label>
+                        <textarea name="notes" rows="3" placeholder="点検希望、タイヤ交換など"></textarea>
+                    </div>
+                    <button type="submit" class="btn" id="submit-btn">送信する</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="success-screen" class="success-msg">
+            <h3>ご協力ありがとうございました</h3>
+            <p>内容を送信いたしました。スタッフがご案内いたしますので、そのまま少々お待ちください。</p>
+            <button class="btn" style="background:#334155; margin-top:30px;"
+                onclick="location.reload()">入力をやり直す</button>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Configuration (Hardcoded for Public Access)
+        const SUPABASE_URL = 'https://isoqzliuqtgobipilioh.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_yTBt7kOjMtftBnMfLyMlvg_ktfzk0DF';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        document.getElementById('customer-self-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = '送信中...';
+
+            const formData = new FormData(e.target);
+            const customerData = {
+                id: 'self-' + Date.now(),
+                name: formData.get('name'),
+                kana: formData.get('kana'),
+                phone: formData.get('phone'),
+                email: formData.get('email'),
+                lineId: formData.get('lineId'),
+                notes: formData.get('notes'),
+                status: 'new',
+                createdAt: new Date().toISOString()
+            };
+
+            const { error } = await supabaseClient.from('customers').insert([customerData]);
+
+            if (error) {
+                alert('送信エラーが発生しました: ' + error.message);
+                btn.disabled = false;
+                btn.innerText = '送信する';
+            } else {
+                document.getElementById('entry-form-container').style.display = 'none';
+                document.getElementById('success-screen').style.display = 'block';
+            }
+        };
+    </script>
+</body>
+
+</html>

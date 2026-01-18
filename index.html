@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM & Kanban | Premium Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Noto+Sans+JP:wght@300;400;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://kit.fontawesome.com/your-fontawesome-key.js" crossorigin="anonymous"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+</head>
+
+<body class="dark-theme">
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-card glass fade-in">
+            <div class="logo mb-24">
+                <div class="logo-icon"></div>
+                <h2>NextCore CRM Login</h2>
+            </div>
+            <form id="login-form" class="modal-form">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" required placeholder="your@email.com" class="glass-input">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="glass-input">
+                </div>
+                <button type="submit" class="btn btn-primary w-full mt-16">Sign In</button>
+            </form>
+            <p id="auth-error" class="text-danger mt-16 text-center hidden"></p>
+        </div>
+    </div>
+
+    <div class="app-container hidden" id="app-main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h2>NextCore CRM</h2>
+            </div>
+            <nav>
+                <ul>
+                    <li class="active" data-view="dashboard">
+                        <span class="icon">📊</span>
+                        <span>ダッシュボード</span>
+                    </li>
+                    <li data-view="reservations"><i class="fas fa-calendar-alt"></i> 予約管理</li>
+                    <li data-view="customers"><i class="fas fa-users"></i> 顧客一覧</li>
+                    <li data-view="kanban"><i class="fas fa-clipboard-list"></i> 受注リスト</li>
+                    <li data-view="parts"><i class="fas fa-boxes"></i> 部品発注</li>
+                    <li data-view="settings">
+                        <span class="icon">⚙️</span>
+                        <span>設定</span>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">AD</div>
+                    <div class="user-info">
+                        <p class="name">管理者</p>
+                        <p class="role">Admin User</p>
+                    </div>
+                    <button class="btn btn-icon ml-auto" onclick="cloudStore.signOut()" title="ログアウト">🚪</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-bar glass">
+                <div class="search-box">
+                    <span class="icon">🔍</span>
+                    <input type="text" placeholder="検索...">
+                </div>
+                <div class="top-actions">
+                    <div id="sync-status-indicator" class="sync-status">
+                        <span class="status-dot warning"></span> 読み込み中...
+                    </div>
+                    <button class="btn btn-secondary" onclick="showCustomerEntryQR()" title="QRコードを表示">📲 QR受付</button>
+                    <div class="clock" id="real-time-clock">12:00:00</div>
+                    <button class="btn btn-primary" id="add-new-btn">+ 新規追加</button>
+                    <div class="notifications">
+                        <span class="icon">🔔</span>
+                        <span class="badge">3</span>
+                    </div>
+                </div>
+            </header>
+
+            <div id="view-container" class="view-content fade-in">
+                <!-- Views will be injected here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="modal-overlay hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="modal-title">New Entry</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="customers.js" defer></script>
+    <script src="kanban.js" defer></script>
+    <script src="parts.js" defer></script>
+    <script src="taskDetail.js" defer></script>
+    <script src="googleCalendar.js" defer></script>
+    <script src="reservations.js" defer></script>
+    <script src="cloudStore.js" defer></script>
+    <script src="app.js" defer></script>
+</body>
+
+</html>

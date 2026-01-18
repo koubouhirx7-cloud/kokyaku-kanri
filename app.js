@@ -1,0 +1,602 @@
+/**
+ * Main Application Logic
+ */
+
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+});
+
+async function initApp() {
+    initClock();
+    initNavigation();
+    initModal();
+    initAuth();
+
+    // Google Calendar Init
+    if (typeof googleCalendar !== 'undefined') {
+        googleCalendar.loadGapi();
+    }
+
+    // Cloud Sync Initialization
+    const cloudActive = cloudStore.init();
+    updateSyncStatusUI();
+
+    if (cloudActive) {
+        // Check Session
+        const session = await cloudStore.getSession();
+        if (session) {
+            setupAuthenticatedApp();
+        } else {
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('app-main-container').classList.add('hidden');
+        }
+    } else {
+        // No cloud config - just show app
+        setupAuthenticatedApp();
+    }
+}
+
+async function setupAuthenticatedApp() {
+    document.getElementById('auth-overlay').classList.add('hidden');
+    document.getElementById('app-main-container').classList.remove('hidden');
+
+    // Auto Archive Check
+    checkAndArchiveTasks();
+
+    if (cloudStore.isActive) {
+        await syncDataFromCloud();
+    }
+
+    loadView('dashboard'); // Initial view
+}
+
+function initAuth() {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('auth-error');
+
+            const { data, error } = await cloudStore.signIn(email, password);
+
+            if (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.remove('hidden');
+            } else {
+                setupAuthenticatedApp();
+            }
+        };
+    }
+}
+
+async function syncDataFromCloud() {
+    const remoteCustomers = await cloudStore.fetchTable('customers');
+    const remoteTasks = await cloudStore.fetchTable('tasks');
+
+    // SCENARIO 1: Cloud is empty, Local has data -> Push Local to Cloud
+    if ((!remoteCustomers || remoteCustomers.length === 0) && appState.customers.length > 0) {
+        console.log('Cloud is empty. Pushing local data to cloud...');
+        await cloudStore.pushLocalToCloud(appState.customers, appState.tasks);
+        return;
+    }
+
+    // SCENARIO 2: Cloud has data -> Smart Merge (Prioritize Cloud but keep local-only changes if possible)
+    // For simplicity in this version, we will adopt Cloud as Truth IF it exists,
+    // but we will warn/alert if this might be dangerous in a real app.
+    // Here we just check if we got data back.
+    if (remoteCustomers && remoteCustomers.length > 0) {
+        appState.customers = remoteCustomers;
+    }
+
+    if (remoteTasks && remoteTasks.length > 0) {
+        appState.tasks = remoteTasks;
+    }
+
+    // Local backup update
+    store.save('customers', appState.customers);
+    store.save('tasks', appState.tasks);
+}
+
+// Data Store (LocalStorage & Cloud Wrapper)
+const store = {
+    get(key) {
+        const value = localStorage.getItem(`crm_${key}`);
+        return value ? JSON.parse(value) : [];
+    },
+    async save(key, data) {
+        // Save to LocalStorage with error handling
+        try {
+            localStorage.setItem(`crm_${key}`, JSON.stringify(data));
+        } catch (e) {
+            console.error('LocalStorage Save Error:', e);
+            if (e.name === 'QuotaExceededError') {
+                alert('保存容量が一杯です。画像の枚数を減らすか、不要なデータを削除してください。');
+                return; // Stop sync if local save fails critical
+            }
+        }
+
+        // Save to Cloud if active
+        if (cloudStore.isActive && (key === 'customers' || key === 'tasks')) {
+            console.log(`Syncing ${key} to cloud...`);
+            const { error } = await cloudStore.client.from(key).upsert(data);
+            if (error) {
+                console.error(`Cloud sync error for ${key}:`, error);
+                // Optional: showToast('クラウド同期エラー');
+            } else {
+                console.log(`${key} synced successfully`);
+            }
+        }
+    }
+};
+
+// State Management
+let appState = {
+    currentView: 'dashboard',
+    customers: store.get('customers'),
+    tasks: store.get('tasks'),
+    kanbanColumns: store.get('kanban_columns'),
+    archivedTasks: store.get('archived_tasks')
+};
+
+// Archive Logic
+function checkAndArchiveTasks() {
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = new Date().getTime();
+    let changed = false;
+
+    // Filter tasks pending archive
+    const activeTasks = [];
+    const tasksToArchive = [];
+
+    appState.tasks.forEach(task => {
+        if (task.status === 'done' && task.completedAt) {
+            const completedTime = new Date(task.completedAt).getTime();
+            if (now - completedTime > ONE_WEEK_MS) {
+                tasksToArchive.push(task);
+            } else {
+                activeTasks.push(task);
+            }
+        } else {
+            activeTasks.push(task);
+        }
+    });
+
+    if (tasksToArchive.length > 0) {
+        console.log(`Archving ${tasksToArchive.length} tasks...`);
+
+        // Initialize archive storage if needed
+        if (!appState.archivedTasks) appState.archivedTasks = [];
+
+        tasksToArchive.forEach(task => {
+            // Add archive metadata
+            task.archivedAt = new Date().toISOString();
+            appState.archivedTasks.push(task);
+        });
+
+        appState.tasks = activeTasks;
+
+        store.save('tasks', appState.tasks);
+        store.save('archived_tasks', appState.archivedTasks);
+        changed = true;
+
+        showToast(`${tasksToArchive.length}件の完了タスクをアーカイブしました`);
+    }
+}
+
+// Initialization with Sample Data
+const defaultColumns = [
+    { id: 'contact', title: '問い合わせ', color: '#94a3b8' },
+    { id: 'todo', title: '未着手', color: '#64748b' },
+    { id: 'inprogress', title: '作業中', color: '#4f46e5' },
+    { id: 'waiting', title: '部品待ち/連絡待ち', color: '#f59e0b' },
+    { id: 'done', title: '完了/納品', color: '#10b981' }
+];
+
+if (!appState.kanbanColumns || appState.kanbanColumns.length === 0) {
+    appState.kanbanColumns = defaultColumns;
+    store.save('kanban_columns', appState.kanbanColumns);
+}
+
+// Ensure default data matches new structure if empty
+if (appState.customers.length === 0 && appState.tasks.length === 0) {
+    appState.customers = [
+        {
+            id: '1',
+            name: '山田 太郎',
+            email: 'yamada@example.com',
+            phone: '090-1234-5678',
+            lineId: 'yamada_taro_official',
+            notes: '重要顧客',
+            bikes: [
+                { id: 'b1', model: 'Skyline V2', frameNo: 'SN12345', purchaseDate: '2025-05-20' }
+            ],
+            maintenanceLogs: [
+                { id: 'm1', date: '2025-12-01', work: 'ブレーキ調整', notes: '摩耗していたため再調整。次回交換推奨。' }
+            ],
+            createdAt: new Date().toISOString()
+        },
+        {
+            id: '2',
+            name: '佐藤 花子',
+            email: 'sato@example.com',
+            phone: '080-9876-5432',
+            notes: '',
+            bikes: [],
+            maintenanceLogs: [],
+            createdAt: new Date().toISOString()
+        }
+    ];
+    appState.tasks = [
+        { id: 't1', title: '見積書作成', customerId: '1', customerName: '山田 太郎', status: 'todo', priority: 'high', dueDate: '2026-01-20' },
+        { id: 't2', title: '初回ヒアリング', customerId: '2', customerName: '佐藤 花子', status: 'inprogress', priority: 'medium', dueDate: '2026-01-15' }
+    ];
+    store.save('customers', appState.customers);
+    store.save('tasks', appState.tasks);
+}
+
+// Navigation
+function initNavigation() {
+    const navItems = document.querySelectorAll('nav li');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const view = item.getAttribute('data-view');
+
+            navItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            navigateTo(view);
+        });
+    });
+}
+
+function navigateTo(view, param) {
+    const container = document.getElementById('view-container');
+    appState.currentView = view;
+
+    // Add transition effect
+    container.classList.remove('fade-in');
+    void container.offsetWidth; // Force reflow
+    container.classList.add('fade-in');
+
+    switch (view) {
+        case 'dashboard':
+            renderDashboard(container);
+            break;
+        case 'customers':
+            renderCustomers(container);
+            break;
+        case 'kanban':
+            renderKanban(container);
+            break;
+        case 'parts':
+            renderPartsView(container);
+            break;
+        case 'taskDetail':
+            renderTaskDetail(container, param);
+            break;
+        case 'settings':
+            renderSettings(container);
+            break;
+        case 'reservations':
+            renderReservations(container);
+            break;
+    }
+}
+
+function renderSettings(container) {
+    container.innerHTML = `
+        <div class="glass p-24">
+            <h2>設定</h2>
+            
+            <div class="mt-24">
+                <h3>💾 データバックアップ</h3>
+                <p class="text-secondary mb-16">
+                    ブラウザの保存容量には制限があります。定期的にデータを書き出し、Google Drive等に保存することをお勧めします。
+                </p>
+                <div class="form-group">
+                    <label>Google Drive (保存先)</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" value="https://drive.google.com/drive/folders/1RhK6aCBsJhhM_Wez1_L33-DSi8ZjEIYy?usp=sharing" readonly class="glass-input" style="flex:1; color:#aaa;">
+                        <button class="btn btn-secondary" onclick="window.open('https://drive.google.com/drive/folders/1RhK6aCBsJhhM_Wez1_L33-DSi8ZjEIYy?usp=sharing', '_blank')">フォルダを開く</button>
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-16" onclick="exportData()">
+                    📥 データを書き出し (バックアップ)
+                </button>
+                
+                <div class="mt-24 p-16" style="border-top: 1px solid #444;">
+                    <h3>📅 Google Calendar設定</h3>
+                    <p class="text-secondary mb-8">予約システムと同期するためのAPI設定です。</p>
+                    <div class="form-group">
+                        <label>Client ID</label>
+                        <input type="text" id="g-client-id" class="glass-input" value="${localStorage.getItem('crm_google_client_id') || (typeof CRM_CONFIG !== 'undefined' && CRM_CONFIG.google ? CRM_CONFIG.google.clientId : '')}" placeholder="xxxxxxxx.apps.googleusercontent.com">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key</label>
+                        <input type="text" id="g-api-key" class="glass-input" value="${localStorage.getItem('crm_google_api_key') || (typeof CRM_CONFIG !== 'undefined' && CRM_CONFIG.google ? CRM_CONFIG.google.apiKey : '')}" placeholder="AIzaSy...">
+                    </div>
+                    <button class="btn btn-secondary mt-8" onclick="saveGoogleConfig()">設定を保存 & 再読み込み</button>
+                </div>
+
+                <div class="mt-24 p-16" style="border-top: 1px solid #444;">
+                    <h3>📤 データの復元</h3>
+                    <p class="text-secondary mb-8">バックアップファイル(.json)を読み込んで復元します。</p>
+                    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(this)">
+                    <button class="btn btn-secondary" onclick="document.getElementById('import-file').click()">
+                        📂 ファイルを選択して復元
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.importData = (input) => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.customers && data.tasks) {
+                if (confirm('現在のデータを上書きして復元してもよろしいですか？')) {
+                    appState.customers = data.customers;
+                    appState.tasks = data.tasks;
+                    store.save('customers', appState.customers);
+                    store.save('tasks', appState.tasks);
+                    alert('復元が完了しました。ページをリロードします。');
+                    location.reload();
+                }
+            } else {
+                alert('無効なバックアップファイルです。');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('ファイルの読み込みに失敗しました。');
+        }
+    };
+    reader.readAsText(file);
+};
+
+window.exportData = () => {
+    const data = {
+        customers: appState.customers,
+        tasks: appState.tasks,
+        timestamp: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `crm_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert('バックアップファイルをダウンロードしました。\n指定のGoogle Driveフォルダにアップロードしてください。');
+};
+
+// Rename loadView to navigateTo for consistency or just proxy it
+function loadView(view) {
+    navigateTo(view);
+}
+
+// Dashboard View
+function renderDashboard(container) {
+    const stats = calculateStats();
+    const focusTask = appState.tasks.find(t => t.priority === 'high' && t.status !== 'done');
+
+    container.innerHTML = `
+        <div class="dashboard-grid">
+            <div class="stat-card glass slide-up">
+                <div class="stat-label">👥 総顧客数</div>
+                <div class="stat-value">${stats.totalCustomers}</div>
+                <div class="stat-trend up">+ ${stats.newCustomersThisMonth} (今月)</div>
+            </div>
+            <div class="stat-card glass slide-up" style="animation-delay: 0.1s">
+                <div class="stat-label">⏳ 進行中のタスク</div>
+                <div class="stat-value">${stats.activeTasks}</div>
+            </div>
+            <div class="stat-card glass slide-up" style="animation-delay: 0.2s">
+                <div class="stat-label">✅ 完了済み</div>
+                <div class="stat-value">${stats.completedTasks}</div>
+            </div>
+        </div>
+        
+        <div class="dashboard-layout mt-24">
+            <div class="dashboard-main glass slide-up" style="animation-delay: 0.3s">
+                <h3>📋 最近のタスク</h3>
+                <div id="recent-tasks-list">
+                    ${renderRecentTasks()}
+                </div>
+            </div>
+            <div class="dashboard-side glass slide-up" style="animation-delay: 0.4s">
+                <h3>🎯 今日のフォーカス</h3>
+                <div class="focus-content">
+                    ${focusTask ? `
+                        <div class="focus-card highlight">
+                            <div class="focus-title">${focusTask.title}</div>
+                            <div class="focus-customer">${focusTask.customerName}</div>
+                            <div class="focus-meta">期限: ${focusTask.dueDate || '未設定'}</div>
+                        </div>
+                    ` : '<p class="text-secondary">優先タスクはありません</p>'}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function calculateStats() {
+    return {
+        totalCustomers: appState.customers.length,
+        newCustomersThisMonth: 0,
+        activeTasks: appState.tasks.filter(t => t.status !== 'done').length,
+        completedTasks: appState.tasks.filter(t => t.status === 'done').length
+    };
+}
+
+function renderRecentTasks() {
+    if (appState.tasks.length === 0) return '<p class="text-secondary p-16">タスクがありません</p>';
+
+    return appState.tasks.slice(-5).map(task => `
+        <div class="recent-task-item">
+            <span class="status-dot ${task.status}"></span>
+            <span class="task-title">${task.title}</span>
+            <span class="task-date">${task.dueDate || ''}</span>
+        </div>
+    `).join('');
+}
+
+// Real-time Clock
+function initClock() {
+    const clockEl = document.getElementById('real-time-clock');
+    setInterval(() => {
+        const now = new Date();
+        clockEl.textContent = now.toLocaleTimeString('ja-JP', { hour12: false });
+    }, 1000);
+}
+
+// Modal handling
+function initModal() {
+    const modal = document.getElementById('modal-container');
+    const closeBtn = document.querySelector('.close-modal');
+
+    closeBtn.onclick = () => modal.classList.add('hidden');
+    window.onclick = (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+    };
+
+    document.getElementById('add-new-btn').onclick = () => {
+        if (appState.currentView === 'customers') {
+            showAddCustomerModal();
+        } else if (appState.currentView === 'kanban') {
+            showAddTaskModal();
+        } else {
+            showAddTaskModal(); // Default to task if on dashboard
+        }
+    };
+}
+
+function showModal(title, bodyHtml) {
+    const modal = document.getElementById('modal-container');
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-body').innerHTML = bodyHtml;
+    modal.classList.remove('hidden');
+}
+
+// Utility for CSS
+const globalCSS = `
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+}
+.stat-card {
+    padding: 24px;
+    border-radius: var(--radius);
+}
+.stat-label { color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 8px; }
+.stat-value { font-size: 2rem; font-weight: 600; margin-bottom: 8px; }
+.stat-trend { font-size: 0.75rem; }
+.stat-trend.up { color: var(--success); }
+.p-24 { padding: 24px; }
+.mt-24 { margin-top: 24px; }
+.p-16 { padding: 16px; }
+.recent-task-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 12px;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-dot.todo { background: var(--text-secondary); }
+.status-dot.inprogress { background: var(--accent-color); }
+.status-dot.done { background: var(--success); }
+`;
+
+// Inject additional styles
+const styleSheet = document.createElement("style");
+styleSheet.innerText = globalCSS;
+document.head.appendChild(styleSheet);
+
+// Public Entry QR Logic
+window.showCustomerEntryQR = () => {
+    const publicUrl = localStorage.getItem('crm_public_form_url') || (typeof CRM_CONFIG !== 'undefined' ? CRM_CONFIG.publicUrl : '') || '入力してください';
+    showModal('お客様受付QRコード', `
+        <div class='p-16 text-center'>
+            <p class='text-secondary mb-16'>お客様のスマホでこのQRコードを読み取ってもらってください。</p>
+            <div id='qrcode-container' class='flex-center p-16 bg-white rounded-lg mb-16' style='display:inline-block; padding:10px; background:white;'></div>
+            <div class='mt-16 text-left'>
+                <label class='text-small text-secondary'>公開URL設定 (GitHub Pages等):</label>
+                <div class='flex gap-8 mt-4'>
+                    <input type='text' id='public-url-input' class='glass-input' value='${publicUrl}' style='width:100%; background:rgba(0,0,0,0.2); border:1px solid #444; color:white; padding:8px;'>
+                    <button class='btn btn-small btn-primary' onclick='savePublicUrl()'>保存</button>
+                </div>
+            </div>
+        </div>
+    `);
+
+    const container = document.getElementById('qrcode-container');
+    if (publicUrl && publicUrl !== '入力してください') {
+        new QRCode(container, {
+            text: publicUrl,
+            width: 200,
+            height: 200,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    } else {
+        container.innerHTML = '<p class="text-danger">URLを設定してください</p>';
+    }
+};
+
+window.savePublicUrl = () => {
+    const url = document.getElementById('public-url-input').value;
+    localStorage.setItem('crm_public_form_url', url);
+    showToast('URLを保存しました');
+    showCustomerEntryQR(); // Refresh QR
+};
+
+window.saveGoogleConfig = () => {
+    const cid = document.getElementById('g-client-id').value;
+    const key = document.getElementById('g-api-key').value;
+
+    if (!cid || !key) {
+        alert('Client IDとAPI Keyの両方を入力してください。');
+        return;
+    }
+
+    localStorage.setItem('crm_google_client_id', cid);
+    localStorage.setItem('crm_google_api_key', key);
+    alert('設定を保存しました。システムをリロードします。');
+    location.reload();
+};
+
+window.showToast = (message) => {
+    let toast = document.getElementById('toast-msg');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast-msg';
+        toast.style.cssText = `
+            position: fixed; bottom: 24px; right: 24px; 
+            background: rgba(30, 41, 59, 0.9); border: 1px solid var(--primary);
+            color: white; padding: 12px 24px; border-radius: 8px; 
+            z-index: 3000; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: opacity 0.3s, transform 0.3s;
+        `;
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+    }, 3000);
+};
