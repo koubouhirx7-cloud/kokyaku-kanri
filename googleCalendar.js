@@ -233,4 +233,8 @@ const googleCalendar = {
             return null;
         }
     }
+}
 };
+
+// Ensure global scope access
+window.googleCalendar = googleCalendar;
