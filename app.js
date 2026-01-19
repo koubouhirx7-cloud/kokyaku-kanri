@@ -415,6 +415,16 @@ function renderSettings(container) {
             <h2>設定</h2>
             
             <div class="mt-24">
+                <h3>🎨 テーマ設定</h3>
+                <div class="form-group mt-16">
+                    <label class="flex items-center gap-8" style="cursor:pointer;">
+                        <input type="checkbox" id="theme-toggle" onchange="toggleTheme()" ${document.body.getAttribute('data-theme') === 'light' ? 'checked' : ''}>
+                        <span>ライトモードを有効にする</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-24" style="border-top: 1px solid #444; padding-top: 16px;">
                 <h3>💾 データバックアップ</h3>
                 <p class="text-secondary mb-16">
                     ブラウザの保存容量には制限があります。定期的にデータを書き出し、Google Drive等に保存することをお勧めします。
@@ -776,3 +786,21 @@ window.showToast = (message) => {
         toast.style.transform = 'translateY(10px)';
     }, 3000);
 };
+
+// Theme Logic
+window.toggleTheme = () => {
+    const isLight = document.getElementById('theme-toggle').checked;
+    if (isLight) {
+        document.body.setAttribute('data-theme', 'light');
+        localStorage.setItem('crm_theme', 'light');
+    } else {
+        document.body.removeAttribute('data-theme');
+        localStorage.setItem('crm_theme', 'dark');
+    }
+};
+
+// Init Theme
+const savedTheme = localStorage.getItem('crm_theme');
+if (savedTheme === 'light') {
+    document.body.setAttribute('data-theme', 'light');
+}

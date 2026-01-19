@@ -11,6 +11,18 @@
     --border-color: rgba(255, 255, 255, 0.1);
 }
 
+[data-theme="light"] {
+    --bg-color: #f1f5f9;
+    --bg-dark: #e2e8f0;
+    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --primary: #4f46e5;
+    --accent: #0ea5e9;
+    --text-main: #1e293b;
+    --text-secondary: #475569;
+    --border-color: rgba(0, 0, 0, 0.1);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -770,6 +782,7 @@ nav li.active {
 .text-center {
     text-align: center;
 }
+
 /* FullCalendar Dark Theme Overrides */
 :root {
     --fc-border-color: rgba(255, 255, 255, 0.1);
@@ -796,7 +809,7 @@ nav li.active {
     border-color: var(--fc-border-color);
 }
 
-.fc-theme-standard td, 
+.fc-theme-standard td,
 .fc-theme-standard th {
     border-color: var(--fc-border-color);
 }
@@ -819,16 +832,16 @@ nav li.active {
 
 /* Buttons */
 .fc-button-primary {
-    background: rgba(255,255,255,0.1) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
     color: white !important;
     transition: all 0.2s;
 }
 
 .fc-button-primary:hover,
 .fc-button-primary:focus {
-    background: rgba(255,255,255,0.2) !important;
-    border-color: rgba(255,255,255,0.2) !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 .fc-button-active {
@@ -863,9 +876,11 @@ nav li.active {
 .fc-list {
     border-color: var(--border-color);
 }
+
 .fc-list-day-cushion {
-    background-color: rgba(255,255,255,0.05) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
 }
+
 .fc-list-event:hover td {
-    background-color: rgba(255,255,255,0.05) !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
 }
