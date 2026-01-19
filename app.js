@@ -71,63 +71,6 @@ function initAuth() {
     }
 }
 
-async function syncDataFromCloud() {
-    console.log('Syncing data from cloud...');
-    const remoteCustomers = await cloudStore.fetchTable('customers');
-    const remoteTasks = await cloudStore.fetchTable('tasks');
-
-    // SCENARIO 1: Cloud is empty, Local has data -> Push Local to Cloud
-    if ((!remoteCustomers || remoteCustomers.length === 0) && appState.customers.length > 0) {
-        console.log('Cloud is empty (customers). Pushing local data to cloud...');
-        await cloudStore.pushLocalToCloud(appState.customers, appState.tasks);
-        return;
-    }
-
-    // SCENARIO 2: Smart Merge
-    // 1. If Remote has it, usage Remote (Server Authority for edits)
-    // 2. If Remote missing it, but Local has it -> Keep Local (It's a new unsynced item) -> Push to Cloud
-    let needsPush = false;
-
-    if (remoteCustomers) {
-        const { merged, hasLocalOnly } = mergeData(appState.customers, remoteCustomers);
-        appState.customers = merged;
-        if (hasLocalOnly) needsPush = true;
-    }
-
-    if (remoteTasks) {
-        const { merged, hasLocalOnly } = mergeData(appState.tasks, remoteTasks);
-        appState.tasks = merged;
-        if (hasLocalOnly) needsPush = true;
-    }
-
-    // Local backup update
-    store.save('customers', appState.customers);
-    store.save('tasks', appState.tasks);
-
-    // If we found local items that weren't in cloud, sync them up now
-    if (needsPush) {
-        console.log('Found local-only items after merge. Pushing to cloud...');
-        await cloudStore.client.from('customers').upsert(appState.customers);
-        await cloudStore.client.from('tasks').upsert(appState.tasks);
-    }
-}
-
-function mergeData(localItems, remoteItems) {
-    const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
-    const merged = [...remoteItems]; // Start with all remote items
-    let hasLocalOnly = false;
-
-    localItems.forEach(local => {
-        if (!remoteMap.has(local.id)) {
-            // Exists locally but not in remote => Keep it (Offline creation)
-            merged.push(local);
-            hasLocalOnly = true;
-        }
-    });
-
-    return { merged, hasLocalOnly };
-}
-
 // Data Store (LocalStorage & Cloud Wrapper)
 const store = {
     get(key) {
@@ -135,31 +78,39 @@ const store = {
         return value ? JSON.parse(value) : [];
     },
     async save(key, data) {
-        // Save to LocalStorage with error handling
+        // Save to LocalStorage
         try {
             localStorage.setItem(`crm_${key}`, JSON.stringify(data));
         } catch (e) {
             console.error('LocalStorage Save Error:', e);
             if (e.name === 'QuotaExceededError') {
                 alert('保存容量が一杯です。画像の枚数を減らすか、不要なデータを削除してください。');
-                return; // Stop sync if local save fails critical
+                return;
             }
         }
 
-        // Save to Cloud if active
+        // Save to Cloud
         if (cloudStore.isActive && (key === 'customers' || key === 'tasks')) {
             console.log(`Syncing ${key} to cloud...`);
             const { error } = await cloudStore.client.from(key).upsert(data);
             if (error) {
                 console.error(`Cloud sync error for ${key}:`, error);
-                // Optional: showToast('クラウド同期エラー');
             } else {
                 console.log(`${key} synced successfully`);
             }
         }
     },
     async delete(key, id) {
-        if (cloudStore.isActive && (key === 'customers' || key === 'tasks')) {
+        // 1. Add to Tombstone list (Deleted IDs)
+        if (key === 'customers' || key === 'tasks') {
+            if (!appState.deletedIds.includes(id)) {
+                appState.deletedIds.push(id);
+                store.save('deleted_ids', appState.deletedIds);
+            }
+        }
+
+        // 2. Try to Delete from Cloud
+        if (cloudStore.isActive) {
             console.log(`Deleting from cloud ${key}: ${id}`);
             const { error } = await cloudStore.client.from(key).delete().eq('id', id);
             if (error) {
@@ -177,8 +128,76 @@ let appState = {
     customers: store.get('customers'),
     tasks: store.get('tasks'),
     kanbanColumns: store.get('kanban_columns'),
-    archivedTasks: store.get('archived_tasks')
+    archivedTasks: store.get('archived_tasks'),
+    deletedIds: store.get('deleted_ids') // Tombstones
 };
+
+async function syncDataFromCloud() {
+    console.log('Syncing data from cloud...');
+    const remoteCustomers = await cloudStore.fetchTable('customers');
+    const remoteTasks = await cloudStore.fetchTable('tasks');
+
+    // SCENARIO 1: Cloud is empty, Local has data -> Push Local to Cloud
+    if ((!remoteCustomers || remoteCustomers.length === 0) && appState.customers.length > 0) {
+        console.log('Cloud is empty. Pushing local data to cloud...');
+        await cloudStore.pushLocalToCloud(appState.customers, appState.tasks);
+        return;
+    }
+
+    // SCENARIO 2: Smart Merge with Tombstone Check
+    let needsPush = false;
+
+    if (remoteCustomers) {
+        const { merged, hasLocalOnly } = mergeData(appState.customers, remoteCustomers, appState.deletedIds);
+        appState.customers = merged;
+        if (hasLocalOnly) needsPush = true;
+    }
+
+    if (remoteTasks) {
+        const { merged, hasLocalOnly } = mergeData(appState.tasks, remoteTasks, appState.deletedIds);
+        appState.tasks = merged;
+        if (hasLocalOnly) needsPush = true;
+    }
+
+    // Local backup update
+    store.save('customers', appState.customers);
+    store.save('tasks', appState.tasks);
+    store.save('deleted_ids', appState.deletedIds);
+
+    // Sync local-only items
+    if (needsPush) {
+        console.log('Found local-only items after merge. Pushing to cloud...');
+        await cloudStore.client.from('customers').upsert(appState.customers);
+        await cloudStore.client.from('tasks').upsert(appState.tasks);
+    }
+}
+
+function mergeData(localItems, remoteItems, deletedIds = []) {
+    const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
+    const merged = [];
+    let hasLocalOnly = false;
+
+    // 1. Process Remote Items (Truth) - Filter out deleted
+    remoteItems.forEach(remote => {
+        if (!deletedIds.includes(remote.id)) {
+            merged.push(remote);
+        } else {
+            console.log(`Filtered out zombie item: ${remote.id}`);
+        }
+    });
+
+    // 2. Process Local Items - Add if not in remote AND not deleted
+    localItems.forEach(local => {
+        if (!remoteMap.has(local.id)) {
+            if (!deletedIds.includes(local.id)) {
+                merged.push(local);
+                hasLocalOnly = true;
+            }
+        }
+    });
+
+    return { merged, hasLocalOnly };
+}
 
 // Archive Logic
 function checkAndArchiveTasks() {
