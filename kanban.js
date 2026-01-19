@@ -252,32 +252,6 @@ window.showArchiveModal = () => {
 window.showAddTaskModal = () => {
     const customerOptions = appState.customers.map(c => `<option value="${c.name}"></option>`).join('');
 
-    // Helper for rows
-    const generateInputRows = (type) => {
-        let html = '';
-        for (let i = 0; i < 5; i++) {
-            if (type === 'order') {
-                html += `
-                <div class="grid-row mb-4" style="display: grid; grid-template-columns: 3fr 1fr 1fr; gap: 8px;">
-                    <input type="text" name="order_name_${i}" placeholder="部品名" class="glass-input">
-                    <input type="number" name="order_price_${i}" placeholder="金額" class="glass-input">
-                    <select name="order_status_${i}" class="glass-select">
-                        <option value="pending">未発注</option>
-                        <option value="ordered">発注済</option>
-                    </select>
-                </div>`;
-            } else {
-                html += `
-                <div class="grid-row mb-4" style="display: grid; grid-template-columns: 3fr 1fr 2fr; gap: 8px;">
-                    <input type="text" name="work_content_${i}" placeholder="作業内容" class="glass-input">
-                    <input type="number" name="work_hours_${i}" step="0.5" placeholder="時間" class="glass-input">
-                    <input type="text" name="work_notes_${i}" placeholder="備考" class="glass-input">
-                </div>`;
-            }
-        }
-        return html;
-    };
-
     // Reset images
     currentTaskImages = [];
 
@@ -342,21 +316,25 @@ window.showAddTaskModal = () => {
                  <input type="hidden" name="attachment" id="task-attachment-data">
             </div>
 
-            <!-- Enhanced Input Areas -->
+            <!-- Dynamic Input Areas -->
             <div class="mt-24">
-                <label class="block mb-8 font-bold">📦 発注部品 (最大5件)</label>
-                <div class="text-xs text-secondary mb-4 grid-row" style="display: grid; grid-template-columns: 3fr 1fr 1fr; gap: 8px;">
-                    <span>部品名</span><span>金額</span><span>状態</span>
+                <div class="flex justify-between items-center mb-8">
+                    <label class="font-bold">📦 発注部品</label>
+                    <button type="button" class="btn btn-small btn-secondary" onclick="addOrderRow()">+ 部品を追加</button>
                 </div>
-                ${generateInputRows('order')}
+                <div id="order-items-container">
+                    <!-- Dynamic Rows go here -->
+                </div>
             </div>
 
             <div class="mt-24">
-                <label class="block mb-8 font-bold">🛠️ 作業内容 (最大5件)</label>
-                 <div class="text-xs text-secondary mb-4 grid-row" style="display: grid; grid-template-columns: 3fr 1fr 2fr; gap: 8px;">
-                    <span>内容</span><span>時間(h)</span><span>備考</span>
+                <div class="flex justify-between items-center mb-8">
+                    <label class="font-bold">🛠️ 作業内容</label>
+                    <button type="button" class="btn btn-small btn-secondary" onclick="addWorkRow()">+ 作業を追加</button>
                 </div>
-                ${generateInputRows('work')}
+                <div id="work-items-container">
+                    <!-- Dynamic Rows go here -->
+                </div>
             </div>
 
             <div class="form-footer mt-24">
@@ -364,6 +342,10 @@ window.showAddTaskModal = () => {
             </div>
         </form>
     `);
+
+    // Add initial rows
+    addOrderRow();
+    addWorkRow();
 
     document.getElementById('task-form').onsubmit = (e) => {
         e.preventDefault();
@@ -398,31 +380,36 @@ window.showAddTaskModal = () => {
             return;
         }
 
-        // Collect Order Items
+        // Collect Order Items (Dynamic)
         const orderItems = [];
-        for (let i = 0; i < 5; i++) {
-            const name = formData.get(`order_name_${i}`);
+        document.querySelectorAll('.order-item-row').forEach(row => {
+            const name = row.querySelector('[name="order_name"]').value;
             if (name) {
                 orderItems.push({
                     name: name,
-                    price: formData.get(`order_price_${i}`),
-                    status: formData.get(`order_status_${i}`)
+                    price: row.querySelector('[name="order_price"]').value,
+                    status: row.querySelector('[name="order_status"]').value,
+                    supplier: row.querySelector('[name="order_supplier"]').value,
+                    code: row.querySelector('[name="order_code"]').value,
+                    url: row.querySelector('[name="order_url"]').value,
+                    memo: row.querySelector('[name="order_memo"]').value
                 });
             }
-        }
+        });
 
-        // Collect Work Items
+        // Collect Work Items (Dynamic)
         const workItems = [];
-        for (let i = 0; i < 5; i++) {
-            const content = formData.get(`work_content_${i}`);
+        document.querySelectorAll('.work-item-row').forEach(row => {
+            const content = row.querySelector('[name="work_content"]').value;
             if (content) {
                 workItems.push({
                     content: content,
-                    hours: formData.get(`work_hours_${i}`),
-                    notes: formData.get(`work_notes_${i}`)
+                    hours: row.querySelector('[name="work_hours"]').value,
+                    notes: row.querySelector('[name="work_notes"]').value,
+                    description: row.querySelector('[name="work_description"]').value
                 });
             }
-        }
+        });
 
         const newTask = {
             id: Date.now().toString(),
@@ -579,3 +566,68 @@ function updateImagePreview() {
         container.classList.add('hidden');
     }
 }
+
+// Dynamic Row Helpers
+window.addOrderRow = () => {
+    const container = document.getElementById('order-items-container');
+    const index = Date.now() + Math.random().toString(36).substr(2, 9); // Unique ID for toggle
+    const div = document.createElement('div');
+    div.className = 'glass p-8 mb-8 order-item-row moving-gradient-border';
+    div.innerHTML = `
+        <div class="flex gap-4 items-center mb-4">
+            <input type="text" name="order_name" placeholder="部品名" class="glass-input flex-1" required>
+            <input type="number" name="order_price" placeholder="金額" class="glass-input" style="width: 80px;">
+             <select name="order_status" class="glass-select" style="width: 90px;">
+                <option value="pending">未発注</option>
+                <option value="ordered">発注済</option>
+            </select>
+            <button type="button" class="btn-icon-small" onclick="toggleDetail('detail-${index}')" title="詳細">🔽</button>
+            <button type="button" class="btn-icon-small text-danger" onclick="removeRow(this)" title="削除">×</button>
+        </div>
+        <div id="detail-${index}" class="hidden p-8 bg-darker rounded mt-4" style="background: rgba(0,0,0,0.3);">
+            <div class="grid-2 gap-8 mb-4" style="display:grid; grid-template-columns: 1fr 1fr;">
+                <input type="text" name="order_supplier" placeholder="仕入れ先/メーカー" class="glass-input text-sm">
+                <input type="text" name="order_code" placeholder="品番" class="glass-input text-sm">
+            </div>
+            <div class="mb-4">
+                <input type="url" name="order_url" placeholder="商品URL" class="glass-input text-sm">
+            </div>
+            <textarea name="order_memo" placeholder="備考・メモ" class="glass-input text-sm" rows="1"></textarea>
+        </div>
+    `;
+    container.appendChild(div);
+};
+
+window.addWorkRow = () => {
+    const container = document.getElementById('work-items-container');
+    const index = Date.now() + Math.random().toString(36).substr(2, 9);
+    const div = document.createElement('div');
+    div.className = 'glass p-8 mb-8 work-item-row moving-gradient-border';
+    div.innerHTML = `
+        <div class="flex gap-4 items-center mb-4">
+            <input type="text" name="work_content" placeholder="作業内容" class="glass-input flex-1" required>
+            <input type="number" name="work_hours" step="0.5" placeholder="時間(h)" class="glass-input" style="width: 80px;">
+            <button type="button" class="btn-icon-small" onclick="toggleDetail('detail-${index}')" title="詳細">🔽</button>
+            <button type="button" class="btn-icon-small text-danger" onclick="removeRow(this)" title="削除">×</button>
+        </div>
+        <div id="detail-${index}" class="hidden p-8 bg-darker rounded mt-4" style="background: rgba(0,0,0,0.3);">
+             <div class="mb-4">
+                <textarea name="work_description" placeholder="詳細手順など" class="glass-input text-sm" rows="2"></textarea>
+            </div>
+            <input type="text" name="work_notes" placeholder="備考" class="glass-input text-sm">
+        </div>
+    `;
+    container.appendChild(div);
+};
+
+window.toggleDetail = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden');
+};
+
+window.removeRow = (btn) => {
+    const row = btn.closest('.glass'); // Assuming parent wrapper is .glass
+    if (confirm('削除してもよろしいですか？')) {
+        row.remove();
+    }
+};
