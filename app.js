@@ -659,7 +659,9 @@ document.head.appendChild(styleSheet);
 
 // Public Entry QR Logic
 window.showCustomerEntryQR = () => {
-    const publicUrl = localStorage.getItem('crm_public_form_url') || (typeof CRM_CONFIG !== 'undefined' ? CRM_CONFIG.publicUrl : '') || '入力してください';
+    // Default to current origin + /entry.html if not set
+    const defaultUrl = window.location.origin + '/entry.html';
+    const publicUrl = localStorage.getItem('crm_public_form_url') || (typeof CRM_CONFIG !== 'undefined' ? CRM_CONFIG.publicUrl : '') || defaultUrl;
     showModal('お客様受付QRコード', `
         <div class='p-16 text-center'>
             <p class='text-secondary mb-16'>お客様のスマホでこのQRコードを読み取ってもらってください。</p>
