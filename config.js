@@ -19,5 +19,5 @@ const CRM_CONFIG = {
     },
 
     // Public Form URL (for QR Code)
-    publicUrl: '' // e.g. https://yourname.github.io/crm-form/
+    publicUrl: 'https://kokyaku-kanri.pages.dev' // e.g. https://yourname.github.io/crm-form/
 };
