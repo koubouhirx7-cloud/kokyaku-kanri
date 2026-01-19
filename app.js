@@ -47,7 +47,7 @@ async function setupAuthenticatedApp() {
         await syncDataFromCloud();
     }
 
-    loadView('dashboard'); // Initial view
+    loadView(localStorage.getItem('crm_current_view') || 'dashboard'); // Restore view or default
 }
 
 function initAuth() {
@@ -322,6 +322,14 @@ function navigateTo(view, param) {
     const container = document.getElementById('view-container');
     appState.currentView = view;
 
+    // Save View State
+    localStorage.setItem('crm_current_view', view);
+    if (param) {
+        localStorage.setItem('crm_current_view_param', typeof param === 'object' ? JSON.stringify(param) : param);
+    } else {
+        localStorage.removeItem('crm_current_view_param');
+    }
+
     // Add transition effect
     container.classList.remove('fade-in');
     void container.offsetWidth; // Force reflow
@@ -448,7 +456,17 @@ window.exportData = () => {
 
 // Rename loadView to navigateTo for consistency or just proxy it
 function loadView(view) {
-    navigateTo(view);
+    // Restore params if needed
+    const savedParam = localStorage.getItem('crm_current_view_param');
+    let param = null;
+    if (savedParam) {
+        try {
+            param = JSON.parse(savedParam);
+        } catch (e) {
+            param = savedParam;
+        }
+    }
+    navigateTo(view, param);
 }
 
 // Dashboard View
