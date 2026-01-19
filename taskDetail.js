@@ -96,7 +96,13 @@ function renderTaskDetail(container, taskId) {
         'photos': `
             <div class="draggable-widget glass p-24 h-full" draggable="true" data-id="photos">
                 <div class="widget-header mb-16 flex justify-between items-center cursor-move">
-                    <h3>📷 添付画像 (${images.length})</h3>
+                    <div class="flex items-center gap-8">
+                        <h3>📷 添付画像 (${images.length})</h3>
+                        <label class="btn btn-small btn-secondary cursor-pointer" style="padding: 4px 8px; font-size: 0.8rem;">
+                            + 追加
+                            <input type="file" multiple accept="image/*" style="display:none" onchange="handleTaskDetailAttachment(event, '${task.id}')">
+                        </label>
+                    </div>
                     <span class="drag-handle text-secondary">:::</span>
                 </div>
                 ${images.length > 0 ? `
@@ -317,6 +323,74 @@ window.updateTaskStatusInDetail = (taskId, newStatus) => {
     if (task) {
         task.status = newStatus;
         store.save('tasks', appState.tasks);
-        showToast('ステータスを更新しました');
+    }
+};
+
+window.handleTaskDetailAttachment = async (event, taskId) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const task = appState.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    if (!task.attachments) task.attachments = [];
+    // Ensure array if it was a single string previously (legacy data support)
+    if (!Array.isArray(task.attachments) && task.attachment) {
+        task.attachments = [task.attachment];
+    }
+
+    // Resize Utility (Inlined for simplicity in this module)
+    const resizeImage = (file) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    try {
+        showToast('画像を処理中...');
+        const promises = Array.from(files).map(file => resizeImage(file));
+        const resizedImages = await Promise.all(promises);
+
+        task.attachments = [...task.attachments, ...resizedImages];
+
+        // Update Store
+        store.save('tasks', appState.tasks);
+
+        // Refresh View
+        renderTaskDetail(document.getElementById('view-container'), taskId);
+        showToast(`${resizedImages.length}枚の画像を追加しました`);
+    } catch (e) {
+        console.error(e);
+        showToast('画像のアップロードに失敗しました');
     }
 };
