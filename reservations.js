@@ -8,7 +8,7 @@ function renderReservations(container) {
 
     container.innerHTML = `
         <div class="glass p-24 h-full flex flex-col">
-            <div class="flex justify-between items-center mb-16">
+            <div class="flex justify-between items-start mb-16">
                 <div>
                     <h2>📅 予約管理 (Google Calendar)</h2>
                     <p id="gcal-status-text" class="text-small text-secondary mt-4">${isAuth ? '同期中' : 'Google同期未完了'}</p>
@@ -18,11 +18,13 @@ function renderReservations(container) {
             `<button class="btn btn-primary" onclick="googleCalendar.handleAuthClick()">
                             <i class="fab fa-google"></i> Google認証
                         </button>` :
-            `<span class="text-success mr-16">✅ 同期済み</span>
-                        <button class="btn btn-secondary" onclick="window.open('booking.html', '_blank')" title="お客様向けページを確認">🔗 予約ページ</button>
-                        <button class="btn btn-secondary" onclick="showAddReservationModal()">+ 予約作成</button>
-                        <button class="btn btn-danger" style="margin-left:8px;" onclick="showBlockTimeModal()">⛔️ 時間ブロック</button>
-                        <button class="btn btn-small" onclick="googleCalendar.handleSignoutClick()">ログアウト</button>`
+            `<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+                        <span class="text-success mb-4">✅ 同期済み</span>
+                        <button class="btn btn-secondary w-full" onclick="window.open('booking.html', '_blank')" title="お客様向けページを確認">🔗 予約ページ</button>
+                        <button class="btn btn-secondary w-full" onclick="showAddReservationModal()">+ 予約作成</button>
+                        <button class="btn btn-danger w-full" onclick="showBlockTimeModal()">⛔️ 時間ブロック</button>
+                        <button class="btn btn-small w-full" onclick="googleCalendar.handleSignoutClick()">ログアウト</button>
+                    </div>`
         }
                 </div>
             </div>
