@@ -10,6 +10,9 @@ window.onerror = function (msg, url, line, col, error) {
 };
 
 window.testCloudConnection = async () => {
+    const btn = document.querySelector('button[onclick="testCloudConnection()"]');
+    if (btn) btn.textContent = 'テスト中...';
+
     try {
         if (!cloudStore.client) {
             alert('初期化エラー: Cloud Clientがありません。Configを確認してください。');
@@ -17,12 +20,14 @@ window.testCloudConnection = async () => {
         }
         const { data, error } = await cloudStore.client.from('customers').select('id').limit(1);
         if (error) {
-            alert('接続失敗: ' + error.message);
+            alert('接続失敗: ' + (error.message || JSON.stringify(error)));
         } else {
             alert('接続成功！\nクラウドデータベースにアクセスできました。\nログインできない場合は、メールアドレスかパスワードが間違っています。');
         }
     } catch (e) {
         alert('テストエラー: ' + e.message);
+    } finally {
+        if (btn) btn.textContent = 'クラウド接続テスト';
     }
 };
 
@@ -226,8 +231,9 @@ async function syncDataFromCloud() {
             console.log('Cloud sync successful.');
         } catch (e) {
             console.error('Cloud Sync Failed:', e);
-            // Non-blocking alert, or just log
-            alert('【注意】クラウドへの保存に失敗しました。インターネット接続を確認してください。\nデータは端末に保存されています。');
+            const errorDetail = e.message || JSON.stringify(e);
+            alert(`【注意】クラウドへの保存に失敗しました。\n\n詳細: ${errorDetail}\n\nデータは端末に保存されています。インターネット接続またはログイン状態を確認してください。`);
+            updateSyncStatusIndicator(false);
         }
     }
 }
