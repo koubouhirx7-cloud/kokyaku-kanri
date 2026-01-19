@@ -19,6 +19,7 @@ function renderReservations(container) {
                             <i class="fab fa-google"></i> Google認証
                         </button>` :
             `<span class="text-success mr-16">✅ 同期済み</span>
+                        <button class="btn btn-secondary" onclick="window.open('booking.html', '_blank')" title="お客様向けページを確認">🔗 予約ページ</button>
                         <button class="btn btn-secondary" onclick="showAddReservationModal()">+ 予約作成</button>
                         <button class="btn btn-danger" style="margin-left:8px;" onclick="showBlockTimeModal()">⛔️ 時間ブロック</button>
                         <button class="btn btn-small" onclick="googleCalendar.handleSignoutClick()">ログアウト</button>`
