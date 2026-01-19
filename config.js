@@ -14,8 +14,8 @@ const CRM_CONFIG = {
 
     // Google Services
     google: {
-        clientId: '', // e.g. xxxx.apps.googleusercontent.com
-        apiKey: ''    // e.g. AIza...
+        clientId: '184830631078-d0lmm3sigcudlqkpc2fo9gmag1t6u6lj.apps.googleusercontent.com', // e.g. xxxx.apps.googleusercontent.com
+        apiKey: 'AIzaSyBUL_-NdJa6HGK4sBl_yeDeXbjUAVnW6PI'    // e.g. AIza...
     },
 
     // Public Form URL (for QR Code)
