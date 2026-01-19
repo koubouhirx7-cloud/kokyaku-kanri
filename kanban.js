@@ -65,7 +65,7 @@ function renderTasksByStatus(status) {
         <div class="task-card glass" draggable="true" data-id="${task.id}" onclick="if(!this.classList.contains('dragging') && !event.target.closest('.btn-delete-task')) navigateTo('taskDetail', '${task.id}')">
             <div class="flex justify-between items-start">
                  <div class="task-category">顧客: ${task.customerName || '未指定'}</div>
-                 <button class="btn-delete-task text-secondary hover-text-danger" onclick="deleteTask(event, '${task.id}')" title="削除">×</button>
+                 <button class="btn-delete-task text-secondary hover-text-danger" onclick="deleteTask(event, '${task.id}')" title="削除"><i class="fas fa-trash-alt"></i></button>
             </div>
             <div class="task-title-inner">${task.title}</div>
             <div class="task-meta">
