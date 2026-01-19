@@ -59,7 +59,7 @@ function renderTasksByStatus(status) {
         .filter(t => t.status === status)
         .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
 
-    if (tasks.length === 0) return '<div class="empty-list-placeholder">タスクなし</div>';
+    if (tasks.length === 0) return '';
 
     return tasks.map(task => `
         <div class="task-card glass" draggable="true" data-id="${task.id}" onclick="if(!this.classList.contains('dragging') && !event.target.closest('.btn-delete-task')) navigateTo('taskDetail', '${task.id}')">
