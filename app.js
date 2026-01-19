@@ -9,6 +9,23 @@ window.onerror = function (msg, url, line, col, error) {
     return false;
 };
 
+window.testCloudConnection = async () => {
+    try {
+        if (!cloudStore.client) {
+            alert('初期化エラー: Cloud Clientがありません。Configを確認してください。');
+            return;
+        }
+        const { data, error } = await cloudStore.client.from('customers').select('id').limit(1);
+        if (error) {
+            alert('接続失敗: ' + error.message);
+        } else {
+            alert('接続成功！\nクラウドデータベースにアクセスできました。\nログインできない場合は、メールアドレスかパスワードが間違っています。');
+        }
+    } catch (e) {
+        alert('テストエラー: ' + e.message);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('App starting...');
     try {
