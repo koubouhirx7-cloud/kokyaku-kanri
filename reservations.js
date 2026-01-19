@@ -20,6 +20,7 @@ function renderReservations(container) {
                         </button>` :
             `<span class="text-success mr-16">✅ 同期済み</span>
                         <button class="btn btn-secondary" onclick="showAddReservationModal()">+ 予約作成</button>
+                        <button class="btn btn-danger" style="margin-left:8px;" onclick="showBlockTimeModal()">⛔️ 時間ブロック</button>
                         <button class="btn btn-small" onclick="googleCalendar.handleSignoutClick()">ログアウト</button>`
         }
                 </div>
@@ -77,17 +78,22 @@ function initFullCalendar() {
             try {
                 const events = await googleCalendar.listEvents(info.start, info.end);
                 // Map GCal events to FullCalendar format
-                const fcEvents = events.map(e => ({
-                    title: e.summary,
-                    start: e.start.dateTime || e.start.date,
-                    end: e.end.dateTime || e.end.date,
-                    url: e.htmlLink,
-                    backgroundColor: '#3b82f6',
-                    borderColor: '#2563eb',
-                    extendedProps: {
-                        description: e.description
-                    }
-                }));
+                const fcEvents = events.map(e => {
+                    // Check if it's a "Store Block" event (Red/Tomato)
+                    const isBlock = e.summary && e.summary.startsWith('⛔');
+
+                    return {
+                        title: e.summary,
+                        start: e.start.dateTime || e.start.date,
+                        end: e.end.dateTime || e.end.date,
+                        url: e.htmlLink,
+                        backgroundColor: isBlock ? '#ef4444' : '#3b82f6', // Red for blocks
+                        borderColor: isBlock ? '#b91c1c' : '#2563eb',
+                        extendedProps: {
+                            description: e.description
+                        }
+                    };
+                });
                 successCallback(fcEvents);
             } catch (err) {
                 failureCallback(err);
@@ -241,6 +247,72 @@ async function handleReservationSubmit(e) {
         const calendarEl = document.getElementById('calendar');
         // If we kept a reference to 'calendar' instance properly we could call .refetchEvents()
         // But re-rendering the view is safer/easier to implement in this scope
+        renderReservations(document.getElementById('view-container'));
+    }
+}
+
+function showBlockTimeModal() {
+    // Default to next hour
+    const now = new Date();
+    now.setMinutes(0, 0, 0);
+    now.setHours(now.getHours() + 1);
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    const startStr = now.toISOString().slice(0, 16);
+
+    now.setHours(now.getHours() + 2);
+    const endStr = now.toISOString().slice(0, 16);
+
+    showModal('時間ブロック (店都合)', `
+        <form onsubmit="handleBlockTimeSubmit(event)">
+            <p class="text-secondary mb-16">店休日、休憩、メンテナンス等で予約を受け付けない時間を設定します。</p>
+            
+            <div class="form-group">
+                <label>理由 (タイトル)</label>
+                <input type="text" id="block-title" required class="glass-input" value="店都合" placeholder="例: 休憩、臨時休業">
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>開始日時</label>
+                    <input type="datetime-local" id="block-start" required class="glass-input" value="${startStr}">
+                </div>
+                <div class="form-group">
+                    <label>終了日時</label>
+                    <input type="datetime-local" id="block-end" required class="glass-input" value="${endStr}">
+                </div>
+            </div>
+
+            <div class="flex justify-end mt-16">
+                 <button type="button" class="btn btn-secondary mr-8" onclick="document.getElementById('modal-container').classList.add('hidden')">キャンセル</button>
+                <button type="submit" class="btn btn-danger">ブロックを作成</button>
+            </div>
+        </form>
+    `);
+}
+
+async function handleBlockTimeSubmit(e) {
+    e.preventDefault();
+
+    const title = document.getElementById('block-title').value;
+    const start = document.getElementById('block-start').value;
+    const end = document.getElementById('block-end').value;
+
+    const startObj = new Date(start);
+    const endObj = new Date(end);
+
+    const eventData = {
+        summary: `⛔ ${title}`, // Add emoji to distinguish
+        description: 'CRMより作成された店都合ブロック',
+        start: startObj.toISOString(),
+        end: endObj.toISOString(),
+        colorId: '11' // Red - Tomato
+    };
+
+    const result = await googleCalendar.addEvent(eventData);
+
+    if (result) {
+        document.getElementById('modal-container').classList.add('hidden');
+        showToast('時間をブロックしました');
         renderReservations(document.getElementById('view-container'));
     }
 }
