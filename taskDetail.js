@@ -152,6 +152,7 @@ function renderTaskDetail(container, taskId) {
             <h2 class="ml-16">${task.title}</h2>
             <div class="view-actions ml-auto">
                 <button class="btn btn-secondary mr-8" onclick="resetLayout()">レイアウト初期化</button>
+                <button class="btn btn-secondary mr-8 text-danger" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="deleteTask(event, '${task.id}')">削除</button>
                 <button class="btn btn-primary" onclick="saveTaskDetail('${task.id}')">保存する</button>
             </div>
         </div>
