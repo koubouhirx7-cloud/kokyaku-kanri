@@ -62,8 +62,11 @@ function renderTasksByStatus(status) {
     if (tasks.length === 0) return '<div class="empty-list-placeholder">タスクなし</div>';
 
     return tasks.map(task => `
-        <div class="task-card glass" draggable="true" data-id="${task.id}" onclick="if(!this.classList.contains('dragging')) navigateTo('taskDetail', '${task.id}')">
-            <div class="task-category">顧客: ${task.customerName || '未指定'}</div>
+        <div class="task-card glass" draggable="true" data-id="${task.id}" onclick="if(!this.classList.contains('dragging') && !event.target.closest('.btn-delete-task')) navigateTo('taskDetail', '${task.id}')">
+            <div class="flex justify-between items-start">
+                 <div class="task-category">顧客: ${task.customerName || '未指定'}</div>
+                 <button class="btn-delete-task text-secondary hover-text-danger" onclick="deleteTask(event, '${task.id}')" title="削除">×</button>
+            </div>
             <div class="task-title-inner">${task.title}</div>
             <div class="task-meta">
                 <span class="task-date">📅 ${task.dueDate || '期限なし'}</span>
@@ -76,6 +79,16 @@ function renderTasksByStatus(status) {
         </div>
     `).join('');
 }
+
+window.deleteTask = (e, taskId) => {
+    e.stopPropagation();
+    if (confirm('この案件を削除してもよろしいですか？\n※この操作は取り消せません')) {
+        appState.tasks = appState.tasks.filter(t => t.id !== taskId);
+        store.save('tasks', appState.tasks);
+        renderKanban(document.getElementById('view-container'));
+        showToast('案件を削除しました');
+    }
+};
 
 function initDragAndDrop() {
     const cards = document.querySelectorAll('.task-card');
@@ -291,16 +304,13 @@ window.showAddTaskModal = () => {
                 <input type="text" name="title" required placeholder="例: オーバーホール依頼" class="glass-input">
             </div>
             
+            <div id="customer-select-group">
                 <div class="form-group">
                     <label>関連顧客 (名前を入力または選択)</label>
                     <input type="text" name="customerInput" list="customer-list" class="glass-input" placeholder="顧客名を入力..." autocomplete="off" oninput="handleCustomerInput(this)">
                     <datalist id="customer-list">
                         ${customerOptions}
                     </datalist>
-                </div>
-                <div class="form-group">
-                    <label>期限日</label>
-                    <input type="date" name="dueDate" class="glass-input">
                 </div>
             </div>
 
@@ -320,6 +330,10 @@ window.showAddTaskModal = () => {
             </div>
 
             <div class="form-row">
+                <div class="form-group">
+                    <label>期限日</label>
+                    <input type="date" name="dueDate" class="glass-input">
+                </div>
                 <div class="form-group">
                     <label>優先度</label>
                     <select name="priority" class="glass-select">
@@ -497,6 +511,7 @@ const kanbanCSS = `
     margin-bottom: 12px;
     cursor: grab;
     transition: transform 0.2s, background 0.2s;
+    position: relative;
 }
 .task-card:hover { background: rgba(255, 255, 255, 0.08); }
 .task-card.dragging { opacity: 0.5; cursor: grabbing; transform: scale(1.02); }
@@ -512,6 +527,9 @@ const kanbanCSS = `
 .glass-select { width: 100%; padding: 10px; border-radius: 8px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color); color: white; outline: none; appearance: none; }
 .btn-icon-small { background: rgba(255,255,255,0.1); border: none; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; margin-left: 8px; }
 .btn-icon-small:hover { background: rgba(239, 68, 68, 0.5); }
+.btn-delete-task { background: transparent; border: none; font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 4px; opacity: 0.6; transition: opacity 0.2s; }
+.btn-delete-task:hover { opacity: 1; color: #ef4444; }
+.hover-text-danger:hover { color: #ef4444; }
 .ml-auto { margin-left: auto; }
 `;
 
