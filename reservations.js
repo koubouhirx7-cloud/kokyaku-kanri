@@ -2,91 +2,138 @@
  * Reservations View Logic
  */
 
+
 function renderReservations(container) {
     const isAuth = googleCalendar.isAuthorized;
 
     container.innerHTML = `
-        <div class="glass p-24">
-            <div class="flex justify-between items-center mb-24">
+        <div class="glass p-24 h-full flex flex-col">
+            <div class="flex justify-between items-center mb-16">
                 <div>
                     <h2>📅 予約管理 (Google Calendar)</h2>
-                    <p id="gcal-status-text" class="text-small text-secondary mt-4">初期化中...</p>
+                    <p id="gcal-status-text" class="text-small text-secondary mt-4">${isAuth ? '同期中' : 'Google同期未完了'}</p>
                 </div>
                 <div>
                     ${!isAuth ?
             `<button class="btn btn-primary" onclick="googleCalendar.handleAuthClick()">
                             <i class="fab fa-google"></i> Google認証
                         </button>` :
-            `<span class="text-success mr-16">✅ 認証済み</span>
+            `<span class="text-success mr-16">✅ 同期済み</span>
                         <button class="btn btn-secondary" onclick="showAddReservationModal()">+ 予約作成</button>
                         <button class="btn btn-small" onclick="googleCalendar.handleSignoutClick()">ログアウト</button>`
         }
                 </div>
             </div>
 
-            <div id="reservation-calendar-view">
+            <div id="calendar" class="flex-1 bg-white rounded-lg p-4" style="min-height: 600px; color: #1e293b;">
                 ${!isAuth ?
-            `<div class="text-center p-24 text-secondary">
-                        <p>Googleカレンダーと同期するには、右上のボタンからGoogle認証を行ってください。</p>
-                        <p class="text-small mt-8">※設定画面でClient IDとAPI Keyが設定されている必要があります。</p>
-                    </div>` :
-            `<div class="loading-spinner">読み込み中...</div>`
-        }
+            `<div class="flex-center h-full text-secondary">
+                    <div class="text-center">
+                        <p class="mb-8">Googleカレンダーを表示するには認証が必要です</p>
+                        <button class="btn btn-primary" onclick="googleCalendar.handleAuthClick()">Google認証</button>
+                    </div>
+                </div>` : ''}
             </div>
         </div>
     `;
 
     if (isAuth) {
-        loadReservations();
+        initFullCalendar();
     }
 }
 
-async function loadReservations() {
-    const listContainer = document.getElementById('reservation-calendar-view');
-    const events = await googleCalendar.listUpcomingEvents(20);
+// Global update hook called by googleCalendar.js
+window.updateGCalStatusUI = (isAuthorized) => {
+    const el = document.getElementById('gcal-status-text');
+    if (el) el.textContent = isAuthorized ? '同期中' : 'Google同期未完了';
 
-    if (!events || events.length === 0) {
-        listContainer.innerHTML = '<p class="text-center p-24 text-secondary">直近の予約はありません。</p>';
-        return;
+    // Re-render to show/hide calendar
+    if (appState.currentView === 'reservations') {
+        const container = document.getElementById('view-container');
+        if (container) renderReservations(container);
     }
+};
 
-    let html = '<div class="reservation-list">';
-    html += events.map(event => {
-        const start = new Date(event.start.dateTime || event.start.date);
-        const end = new Date(event.end.dateTime || event.end.date);
-        const dateStr = start.toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit', weekday: 'short' });
-        const timeStr = start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' - ' +
-            end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+function initFullCalendar() {
+    const calendarEl = document.getElementById('calendar');
+    if (!calendarEl) return;
 
-        return `
-            <div class="glass p-16 mb-16 flex justify-between items-center" style="background:rgba(255,255,255,0.05);">
-                <div>
-                    <div class="text-primary font-bold text-lg">${event.summary}</div>
-                    <div class="text-secondary"><i class="far fa-clock"></i> ${dateStr} ${timeStr}</div>
-                    ${event.description ? `<div class="text-small text-secondary mt-4">${event.description}</div>` : ''}
-                </div>
-                <div>
-                    <a href="${event.htmlLink}" target="_blank" class="btn btn-small btn-secondary">Googleで開く</a>
-                </div>
-            </div>
-        `;
-    }).join('');
-    html += '</div>';
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        locale: 'ja',
+        height: '100%',
+        navLinks: true, // can click day/week names to navigate views
+        selectable: true,
+        selectMirror: true,
+        nowIndicator: true,
 
-    listContainer.innerHTML = html;
+        // Fetch events from Google Calendar
+        events: async function (info, successCallback, failureCallback) {
+            try {
+                const events = await googleCalendar.listEvents(info.start, info.end);
+                // Map GCal events to FullCalendar format
+                const fcEvents = events.map(e => ({
+                    title: e.summary,
+                    start: e.start.dateTime || e.start.date,
+                    end: e.end.dateTime || e.end.date,
+                    url: e.htmlLink,
+                    backgroundColor: '#3b82f6',
+                    borderColor: '#2563eb',
+                    extendedProps: {
+                        description: e.description
+                    }
+                }));
+                successCallback(fcEvents);
+            } catch (err) {
+                failureCallback(err);
+            }
+        },
+
+        eventClick: function (info) {
+            info.jsEvent.preventDefault(); // Don't let browser visit the URL immediately
+            if (info.event.url) {
+                window.open(info.event.url);
+            }
+        },
+
+        select: function (info) {
+            // Pre-fill modal with selected dates
+            showAddReservationModal(info.start, info.end);
+        }
+    });
+
+    calendar.render();
 }
 
-function showAddReservationModal() {
-    // Current date/time as default
-    const now = new Date();
-    // Round up to next hour
-    now.setMinutes(0, 0, 0);
-    now.setHours(now.getHours() + 1);
-    const startStr = now.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+function showAddReservationModal(start = null, end = null) {
+    // Current date/time as default if not provided
+    let startStr, endStr;
 
-    // Default duration 2 hours
-    now.setHours(now.getHours() + 2);
-    const endStr = now.toISOString().slice(0, 16);
+    if (start) {
+        // Adjust for timezone offset if needed, or simple ISO slice
+        // FullCalendar returns local Date objects usually
+        const s = new Date(start);
+        s.setMinutes(s.getMinutes() - s.getTimezoneOffset());
+        startStr = s.toISOString().slice(0, 16);
+
+        const e = end ? new Date(end) : new Date(s.getTime() + 60 * 60 * 1000);
+        e.setMinutes(e.getMinutes() - e.getTimezoneOffset());
+        endStr = e.toISOString().slice(0, 16);
+    } else {
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        now.setHours(now.getHours() + 1);
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        startStr = now.toISOString().slice(0, 16);
+
+        now.setHours(now.getHours() + 2);
+        endStr = now.toISOString().slice(0, 16);
+    }
 
     showModal('新規予約作成', `
         <form onsubmit="handleReservationSubmit(event)">
@@ -189,6 +236,11 @@ async function handleReservationSubmit(e) {
 
         document.getElementById('modal-container').classList.add('hidden');
         showToast('予約を作成しました');
-        loadReservations(); // Refresh list
+
+        // Refresh calendar
+        const calendarEl = document.getElementById('calendar');
+        // If we kept a reference to 'calendar' instance properly we could call .refetchEvents()
+        // But re-rendering the view is safer/easier to implement in this scope
+        renderReservations(document.getElementById('view-container'));
     }
 }
