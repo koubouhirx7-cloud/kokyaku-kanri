@@ -68,7 +68,7 @@ function renderTasksByStatus(status) {
             </div>
             <div class="task-indicators mt-8 flex gap-8">
                 ${task.memo ? '<span title="メモあり">📝</span>' : ''}
-                ${task.attachment ? '<span title="画像添付あり">📎</span>' : ''}
+                ${(task.attachments && task.attachments.length > 0) || task.attachment ? '<span title="画像添付あり">📎</span>' : ''}
             </div>
         </div>
     `).join('');
@@ -278,6 +278,9 @@ window.showAddTaskModal = () => {
         return html;
     };
 
+    // Reset images
+    currentTaskImages = [];
+
     showModal('新規案件の登録', `
         <form id="task-form" class="modal-form" style="max-height: 70vh; overflow-y: auto; padding-right: 8px;">
             <div class="form-group">
@@ -330,13 +333,12 @@ window.showAddTaskModal = () => {
             </div>
 
             <div class="form-group mt-16">
-                 <label>添付画像</label>
+                 <label>添付画像 (複数可)</label>
                  <div class="file-upload-box" onclick="document.getElementById('task-image-upload').click()">
                     <span id="upload-placeholder">📎 画像を選択またはドロップ</span>
-                    <img id="image-preview" class="preview-thumb hidden">
-                    <button type="button" id="remove-image-btn" class="remove-img-btn hidden" onclick="event.stopPropagation(); removeImage();">×</button>
+                    <div id="image-preview-container" class="hidden" style="text-align: left;"></div>
                  </div>
-                 <input type="file" id="task-image-upload" accept="image/*" class="hidden" onchange="handleTaskImageUpload(this)">
+                 <input type="file" id="task-image-upload" accept="image/*" multiple class="hidden" onchange="handleTaskImageUpload(this)">
                  <input type="hidden" name="attachment" id="task-attachment-data">
             </div>
 
@@ -431,7 +433,7 @@ window.showAddTaskModal = () => {
             priority: formData.get('priority'),
             status: appState.kanbanColumns.find(c => c.id === 'contact') ? 'contact' : 'todo',
             memo: formData.get('memo'),
-            attachment: document.getElementById('task-attachment-data').value,
+            attachments: document.getElementById('task-attachment-data').value ? JSON.parse(document.getElementById('task-attachment-data').value) : [],
             orderItems: orderItems,
             workItems: workItems,
             createdAt: new Date().toISOString()
@@ -517,3 +519,63 @@ window.handleCustomerInput = (input) => {
         fields.classList.remove('hidden');
     }
 };
+
+// Temporary storage for images
+let currentTaskImages = [];
+
+window.handleTaskImageUpload = (input) => {
+    if (!input.files || input.files.length === 0) return;
+
+    // Convert FileList to Array
+    const files = Array.from(input.files);
+
+    // Process each file
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64 = e.target.result;
+            currentTaskImages.push(base64);
+            updateImagePreview();
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
+window.removeImage = (index) => {
+    currentTaskImages.splice(index, 1);
+    updateImagePreview();
+};
+
+function updateImagePreview() {
+    const container = document.getElementById('image-preview-container');
+    const hiddenInput = document.getElementById('task-attachment-data');
+    const placeholder = document.getElementById('upload-placeholder');
+
+    // Update Hidden Input
+    hiddenInput.value = JSON.stringify(currentTaskImages);
+
+    // Render Thumbnails
+    container.innerHTML = '';
+
+    if (currentTaskImages.length > 0) {
+        placeholder.classList.add('hidden');
+        container.classList.remove('hidden');
+
+        currentTaskImages.forEach((src, index) => {
+            const thumb = document.createElement('div');
+            thumb.className = 'preview-thumb-wrapper';
+            thumb.style.cssText = 'position: relative; display: inline-block; margin: 4px;';
+            thumb.innerHTML = `
+                <img src="${src}" class="preview-thumb" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #555;">
+                <button type="button" onclick="event.stopPropagation(); removeImage(${index})" 
+                    style="position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; border: none; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                    ×
+                </button>
+            `;
+            container.appendChild(thumb);
+        });
+    } else {
+        placeholder.classList.remove('hidden');
+        container.classList.add('hidden');
+    }
+}
