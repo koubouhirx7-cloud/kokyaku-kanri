@@ -391,7 +391,7 @@ nav li.active {
 
 .modal-content {
     width: 100%;
-    max-width: 500px;
+    max-width: 800px;
     border-radius: var(--radius);
     padding: 24px;
     max-height: 85vh;
