@@ -10,9 +10,13 @@ const googleCalendar = {
 
     // Config loaded from LocalStorage
     getConfig() {
+        // Fallback to global CRM_CONFIG if localStorage is empty
+        const configClientId = typeof CRM_CONFIG !== 'undefined' && CRM_CONFIG.google ? CRM_CONFIG.google.clientId : '';
+        const configApiKey = typeof CRM_CONFIG !== 'undefined' && CRM_CONFIG.google ? CRM_CONFIG.google.apiKey : '';
+
         return {
-            clientId: localStorage.getItem('crm_google_client_id') || '',
-            apiKey: localStorage.getItem('crm_google_api_key') || '',
+            clientId: localStorage.getItem('crm_google_client_id') || configClientId || '',
+            apiKey: localStorage.getItem('crm_google_api_key') || configApiKey || '',
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
             scopes: 'https://www.googleapis.com/auth/calendar'
         };
