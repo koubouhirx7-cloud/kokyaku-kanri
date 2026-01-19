@@ -328,6 +328,7 @@ window.updateTaskStatusInDetail = (taskId, newStatus) => {
     const task = appState.tasks.find(t => t.id === taskId);
     if (task) {
         task.status = newStatus;
+        task.updatedAt = new Date().toISOString();
         store.save('tasks', appState.tasks);
     }
 };
@@ -389,6 +390,9 @@ window.handleTaskDetailAttachment = async (event, taskId) => {
 
         task.attachments = [...task.attachments, ...resizedImages];
 
+        task.attachments = [...task.attachments, ...resizedImages];
+        task.updatedAt = new Date().toISOString();
+
         // Update Store
         store.save('tasks', appState.tasks);
 
@@ -413,6 +417,70 @@ window.addDetailRow = (type, taskId) => {
     }
 
     // Save and Re-render
+    task.updatedAt = new Date().toISOString();
     store.save('tasks', appState.tasks);
     renderTaskDetail(document.getElementById('view-container'), taskId);
+};
+
+window.saveTaskDetail = (taskId) => {
+    const task = appState.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // 1. Memo
+    const memoInput = document.getElementById('task-memo-input');
+    if (memoInput) task.memo = memoInput.value;
+
+    // 2. Order Items
+    const orderItems = [];
+    const orderRows = document.querySelectorAll('#widget-container .orders-list .grid-row:not(:first-child)'); // Skip header
+    // Actually, easier to select by class if possible or rely on order-name-${i} classes? 
+    // The previous implementation used dynamic rows. Let's re-parse them.
+    // The rendered HTML used 'order-name-${i}' classes.
+    // But since we are inside a widget that might have been reordered, we should select inputs carefully.
+
+    // Strategy: Parse generated rows from the DOM container for "orders"
+    const orderWidget = document.querySelector('.draggable-widget[data-id="orders"]');
+    if (orderWidget) {
+        const rows = orderWidget.querySelectorAll('.grid-row');
+        // Filter out header row (which has no inputs usually, or verify)
+        // Header row: <div>品名...
+
+        // Let's look for inputs directly
+        // We need to group them. The structure is .grid-row
+        rows.forEach(row => {
+            const nameInput = row.querySelector('input[placeholder*="部品名"]');
+            if (nameInput) {
+                orderItems.push({
+                    name: nameInput.value,
+                    price: row.querySelector('input[placeholder="金額"]').value,
+                    status: row.querySelector('select').value
+                });
+            }
+        });
+        task.orderItems = orderItems;
+    }
+
+    // 3. Work Items
+    const workWidget = document.querySelector('.draggable-widget[data-id="work"]');
+    if (workWidget) {
+        const workItems = [];
+        const rows = workWidget.querySelectorAll('.grid-row');
+        rows.forEach(row => {
+            const contentInput = row.querySelector('input[placeholder="作業内容"]');
+            if (contentInput) {
+                workItems.push({
+                    content: contentInput.value,
+                    hours: row.querySelector('input[placeholder*="時間"]').value,
+                    notes: row.querySelector('input[placeholder="備考"]').value
+                });
+            }
+        });
+        task.workItems = workItems;
+    }
+
+    // Update Timestamp
+    task.updatedAt = new Date().toISOString();
+
+    store.save('tasks', appState.tasks);
+    showToast('案件詳細を保存しました');
 };

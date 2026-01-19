@@ -121,7 +121,9 @@ function showAddCustomerModal() {
             notes: formData.get('notes'),
             bikes: [],
             maintenanceLogs: [],
-            createdAt: new Date().toISOString()
+            maintenanceLogs: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
 
         appState.customers.push(newCustomer);
@@ -256,7 +258,12 @@ window.editCustomer = (id) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const index = appState.customers.findIndex(c => c.id === id);
-        appState.customers[index] = { ...customer, ...Object.fromEntries(formData) };
+        const index = appState.customers.findIndex(c => c.id === id);
+        appState.customers[index] = {
+            ...customer,
+            ...Object.fromEntries(formData),
+            updatedAt: new Date().toISOString()
+        };
         store.save('customers', appState.customers);
         document.getElementById('modal-container').classList.add('hidden');
         renderCustomers(document.getElementById('view-container'));
@@ -566,6 +573,8 @@ function renderBikeForm(customerId, bike) {
         }
 
         console.log('Saving bike data:', bikeData);
+        // Update customer timestamp
+        customer.updatedAt = new Date().toISOString();
         store.save('customers', appState.customers);
         alert('変更を保存しました！'); // EXPLICIT FEEDBACK
         window.viewCustomerDetails(customerId); // Refresh modal
@@ -622,10 +631,13 @@ window.showAddMaintenanceForm = (customerId) => {
             notes: formData.get('notes')
         });
 
-        store.save('customers', appState.customers);
-        window.viewCustomerDetails(customerId); // Refresh modal
-        setTimeout(() => window.switchDetailTab(document.querySelectorAll('.tab-btn')[1], 'bikes'), 50);
-    };
+    });
+
+    customer.updatedAt = new Date().toISOString();
+    store.save('customers', appState.customers);
+    window.viewCustomerDetails(customerId); // Refresh modal
+    setTimeout(() => window.switchDetailTab(document.querySelectorAll('.tab-btn')[1], 'bikes'), 50);
+};
 };
 
 // Injection of Customer-specific styles

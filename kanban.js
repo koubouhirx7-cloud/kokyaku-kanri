@@ -143,6 +143,8 @@ function initDragAndDrop() {
                     } else if (newStatus !== 'done') {
                         delete appState.tasks[taskIndex].completedAt;
                     }
+                    // Update Timestamp
+                    appState.tasks[taskIndex].updatedAt = new Date().toISOString();
                 }
             });
 
@@ -467,7 +469,10 @@ window.showAddTaskModal = () => {
             attachments: document.getElementById('task-attachment-data').value ? JSON.parse(document.getElementById('task-attachment-data').value) : [],
             orderItems: orderItems,
             workItems: workItems,
-            createdAt: new Date().toISOString()
+            orderItems: orderItems,
+            workItems: workItems,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
 
         appState.tasks.push(newTask);
