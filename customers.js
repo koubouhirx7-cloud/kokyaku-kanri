@@ -269,11 +269,25 @@ window.editCustomer = (id) => {
     };
 };
 
-window.deleteCustomer = (id) => {
+window.deleteCustomer = async (id) => {
     if (confirm('この顧客情報を削除してもよろしいですか？')) {
         appState.customers = appState.customers.filter(c => c.id !== id);
         store.save('customers', appState.customers);
-        store.delete('customers', id);
+        // store.delete likely creates a tombstone or just removes? 
+        // Based on usage, appState update + save is the main persistence.
+        // store.delete('customers', id) seems redundant or specific to a different store implementation
+        // but we'll keep it if it was there.
+
+        // Cloud Deletion
+        if (typeof cloudStore !== 'undefined' && cloudStore.isActive) {
+            try {
+                const { error } = await cloudStore.client.from('customers').delete().eq('id', id);
+                if (error) console.error('Cloud delete failed', error);
+            } catch (e) {
+                console.error('Cloud delete error', e);
+            }
+        }
+
         renderCustomers(document.getElementById('view-container'));
     }
 };

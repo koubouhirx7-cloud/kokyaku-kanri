@@ -80,12 +80,22 @@ function renderTasksByStatus(status) {
     `).join('');
 }
 
-window.deleteTask = (e, taskId) => {
+window.deleteTask = async (e, taskId) => {
     e.stopPropagation();
     if (confirm('この案件を削除してもよろしいですか？\n※この操作は取り消せません')) {
         appState.tasks = appState.tasks.filter(t => t.id !== taskId);
         store.save('tasks', appState.tasks);
-        store.delete('tasks', taskId);
+
+        // Cloud Deletion
+        if (typeof cloudStore !== 'undefined' && cloudStore.isActive) {
+            try {
+                const { error } = await cloudStore.client.from('tasks').delete().eq('id', taskId);
+                if (error) console.error('Cloud delete failed', error);
+            } catch (err) {
+                console.error('Cloud delete error', err);
+            }
+        }
+
         renderKanban(document.getElementById('view-container'));
         showToast('案件を削除しました');
     }

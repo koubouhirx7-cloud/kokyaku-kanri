@@ -2,11 +2,24 @@
  * Main Application Logic
  */
 
+// Global Error Handler for Mobile/User Debugging
+window.onerror = function (msg, url, line, col, error) {
+    alert(`システムエラーが発生しました: ${msg}\n行: ${line}`);
+    console.error('Global Error:', error);
+    return false;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-    initApp();
+    console.log('App starting...');
+    try {
+        initApp();
+    } catch (e) {
+        alert('初期化に失敗しました: ' + e.message);
+    }
 });
 
 async function initApp() {
+    console.log('Initializing components...');
     initClock();
     initNavigation();
     initModal();
@@ -53,21 +66,32 @@ async function setupAuthenticatedApp() {
 function initAuth() {
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
+        console.log('Login form found, binding events.');
         loginForm.onsubmit = async (e) => {
             e.preventDefault();
+            console.log('Submitting login...');
             const email = document.getElementById('login-email').value;
             const password = document.getElementById('login-password').value;
             const errorEl = document.getElementById('auth-error');
 
-            const { data, error } = await cloudStore.signIn(email, password);
+            try {
+                const { data, error } = await cloudStore.signIn(email, password);
 
-            if (error) {
-                errorEl.textContent = error.message;
-                errorEl.classList.remove('hidden');
-            } else {
-                setupAuthenticatedApp();
+                if (error) {
+                    console.error('Login error:', error);
+                    errorEl.textContent = error.message;
+                    errorEl.classList.remove('hidden');
+                } else {
+                    console.log('Login success');
+                    setupAuthenticatedApp();
+                }
+            } catch (err) {
+                console.error('SignIn Exception:', err);
+                alert('ログインシステムエラー: ' + err.message);
             }
         };
+    } else {
+        console.warn('Login form NOT found');
     }
 }
 
