@@ -55,7 +55,10 @@ function renderKanbanColumns() {
 }
 
 function renderTasksByStatus(status) {
-    const tasks = appState.tasks.filter(t => t.status === status);
+    const tasks = appState.tasks
+        .filter(t => t.status === status)
+        .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
+
     if (tasks.length === 0) return '<div class="empty-list-placeholder">タスクなし</div>';
 
     return tasks.map(task => `
@@ -79,48 +82,74 @@ function initDragAndDrop() {
     const lists = document.querySelectorAll('.task-list');
 
     cards.forEach(card => {
-        card.addEventListener('dragstart', () => card.classList.add('dragging'));
-        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        card.addEventListener('dragstart', () => {
+            card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+            // Cleanup any placeholders if implemented
+        });
     });
 
     lists.forEach(list => {
         list.addEventListener('dragover', (e) => {
             e.preventDefault();
+            const afterElement = getDragAfterElement(list, e.clientY);
             const draggingCard = document.querySelector('.dragging');
-            // This logic needs to be more sophisticated for proper drag-and-drop reordering
-            // For now, just append to the end
-            if (draggingCard) {
+            if (afterElement == null) {
                 list.appendChild(draggingCard);
+            } else {
+                list.insertBefore(draggingCard, afterElement);
             }
         });
 
         list.addEventListener('drop', (e) => {
             e.preventDefault();
             const draggingCard = document.querySelector('.dragging');
-            if (!draggingCard) return; // Ensure a card is actually being dragged
+            if (!draggingCard) return;
 
             const taskId = draggingCard.getAttribute('data-id');
             const newStatus = list.id.replace('list-', '');
 
-            // Update state
-            const taskIndex = appState.tasks.findIndex(t => t.id === taskId);
-            if (taskIndex !== -1) {
-                appState.tasks[taskIndex].status = newStatus;
+            // Calc new order logic
+            // We need to re-scan the list to get the new order of ALL items in this column
+            const cardsInList = [...list.querySelectorAll('.task-card')];
 
-                // Track completion time for auto-archive
-                if (newStatus === 'done') {
-                    appState.tasks[taskIndex].completedAt = new Date().toISOString();
-                } else {
-                    // Reset if moved out of done
-                    delete appState.tasks[taskIndex].completedAt;
+            // Identify tasks in this column and update their order/status
+            cardsInList.forEach((card, index) => {
+                const cId = card.getAttribute('data-id');
+                const taskIndex = appState.tasks.findIndex(t => t.id === cId);
+                if (taskIndex !== -1) {
+                    appState.tasks[taskIndex].status = newStatus;
+                    appState.tasks[taskIndex].order = index; // Simple 0, 1, 2... order
+
+                    // Completion date logic
+                    if (newStatus === 'done' && !appState.tasks[taskIndex].completedAt) {
+                        appState.tasks[taskIndex].completedAt = new Date().toISOString();
+                    } else if (newStatus !== 'done') {
+                        delete appState.tasks[taskIndex].completedAt;
+                    }
                 }
+            });
 
-                store.save('tasks', appState.tasks);
-                // Refresh counts
-                updateTaskCounts();
-            }
+            store.save('tasks', appState.tasks);
+            updateTaskCounts();
         });
     });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 function updateTaskCounts() {
