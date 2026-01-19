@@ -85,6 +85,7 @@ window.deleteTask = (e, taskId) => {
     if (confirm('この案件を削除してもよろしいですか？\n※この操作は取り消せません')) {
         appState.tasks = appState.tasks.filter(t => t.id !== taskId);
         store.save('tasks', appState.tasks);
+        store.delete('tasks', taskId);
         renderKanban(document.getElementById('view-container'));
         showToast('案件を削除しました');
     }

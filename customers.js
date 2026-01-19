@@ -267,6 +267,7 @@ window.deleteCustomer = (id) => {
     if (confirm('この顧客情報を削除してもよろしいですか？')) {
         appState.customers = appState.customers.filter(c => c.id !== id);
         store.save('customers', appState.customers);
+        store.delete('customers', id);
         renderCustomers(document.getElementById('view-container'));
     }
 };

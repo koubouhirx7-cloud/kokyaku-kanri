@@ -128,6 +128,17 @@ const store = {
                 console.log(`${key} synced successfully`);
             }
         }
+    },
+    async delete(key, id) {
+        if (cloudStore.isActive && (key === 'customers' || key === 'tasks')) {
+            console.log(`Deleting from cloud ${key}: ${id}`);
+            const { error } = await cloudStore.client.from(key).delete().eq('id', id);
+            if (error) {
+                console.error(`Cloud delete error for ${key}:`, error);
+            } else {
+                console.log(`${key} deleted successfully`);
+            }
+        }
     }
 };
 
