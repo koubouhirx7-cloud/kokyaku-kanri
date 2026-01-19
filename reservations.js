@@ -25,7 +25,7 @@ function renderReservations(container) {
                 </div>
             </div>
 
-            <div id="calendar" class="flex-1 bg-white rounded-lg p-4" style="min-height: 600px; color: #1e293b;">
+            <div id="calendar" class="flex-1 rounded-lg p-4" style="min-height: 600px;">
                 ${!isAuth ?
             `<div class="flex-center h-full text-secondary">
                     <div class="text-center">

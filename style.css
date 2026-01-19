@@ -770,3 +770,102 @@ nav li.active {
 .text-center {
     text-align: center;
 }
+/* FullCalendar Dark Theme Overrides */
+:root {
+    --fc-border-color: rgba(255, 255, 255, 0.1);
+    --fc-button-text-color: #fff;
+    --fc-button-bg-color: #2c3333;
+    --fc-button-border-color: #2c3333;
+    --fc-button-hover-bg-color: #3e4e50;
+    --fc-button-hover-border-color: #3e4e50;
+    --fc-button-active-bg-color: #1e293b;
+    --fc-button-active-border-color: #0f172a;
+    --fc-event-bg-color: #3b82f6;
+    --fc-event-border-color: #2563eb;
+    --fc-today-bg-color: rgba(255, 255, 255, 0.03);
+    --fc-neutral-bg-color: rgba(255, 255, 255, 0.03);
+    --fc-list-event-hover-bg-color: rgba(255, 255, 255, 0.05);
+    --fc-page-bg-color: transparent;
+}
+
+.fc {
+    color: var(--text-main);
+}
+
+.fc-theme-standard .fc-scrollgrid {
+    border-color: var(--fc-border-color);
+}
+
+.fc-theme-standard td, 
+.fc-theme-standard th {
+    border-color: var(--fc-border-color);
+}
+
+.fc-col-header-cell-cushion,
+.fc-daygrid-day-number {
+    color: var(--text-secondary);
+    text-decoration: none !important;
+}
+
+.fc-col-header-cell-cushion:hover,
+.fc-daygrid-day-number:hover {
+    color: var(--text-main);
+}
+
+/* Helper for today's highlighting */
+.fc-day-today {
+    background-color: rgba(79, 70, 229, 0.1) !important;
+}
+
+/* Buttons */
+.fc-button-primary {
+    background: rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: white !important;
+    transition: all 0.2s;
+}
+
+.fc-button-primary:hover,
+.fc-button-primary:focus {
+    background: rgba(255,255,255,0.2) !important;
+    border-color: rgba(255,255,255,0.2) !important;
+}
+
+.fc-button-active {
+    background: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+/* Toolbar Title */
+.fc-toolbar-title {
+    font-size: 1.25rem !important;
+    font-weight: 600;
+}
+
+/* Events */
+.fc-event {
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+/* TimeGrid slots */
+.fc-timegrid-slot-label-cushion {
+    color: var(--text-secondary);
+}
+
+.fc-timegrid-axis-cushion {
+    color: var(--text-secondary);
+}
+
+/* List View */
+.fc-list {
+    border-color: var(--border-color);
+}
+.fc-list-day-cushion {
+    background-color: rgba(255,255,255,0.05) !important;
+}
+.fc-list-event:hover td {
+    background-color: rgba(255,255,255,0.05) !important;
+}
