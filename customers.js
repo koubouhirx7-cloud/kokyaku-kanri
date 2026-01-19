@@ -7,6 +7,7 @@ function renderCustomers(container) {
         <div class="view-header">
             <h2>顧客一覧</h2>
             <div class="view-actions">
+                <button class="btn btn-primary" onclick="showAddCustomerModal()">+ 顧客を追加</button>
                 <input type="text" id="customer-search" placeholder="顧客を検索..." class="glass-input">
             </div>
         </div>
