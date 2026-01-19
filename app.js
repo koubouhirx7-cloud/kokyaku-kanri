@@ -72,31 +72,60 @@ function initAuth() {
 }
 
 async function syncDataFromCloud() {
+    console.log('Syncing data from cloud...');
     const remoteCustomers = await cloudStore.fetchTable('customers');
     const remoteTasks = await cloudStore.fetchTable('tasks');
 
     // SCENARIO 1: Cloud is empty, Local has data -> Push Local to Cloud
     if ((!remoteCustomers || remoteCustomers.length === 0) && appState.customers.length > 0) {
-        console.log('Cloud is empty. Pushing local data to cloud...');
+        console.log('Cloud is empty (customers). Pushing local data to cloud...');
         await cloudStore.pushLocalToCloud(appState.customers, appState.tasks);
         return;
     }
 
-    // SCENARIO 2: Cloud has data -> Smart Merge (Prioritize Cloud but keep local-only changes if possible)
-    // For simplicity in this version, we will adopt Cloud as Truth IF it exists,
-    // but we will warn/alert if this might be dangerous in a real app.
-    // Here we just check if we got data back.
-    if (remoteCustomers && remoteCustomers.length > 0) {
-        appState.customers = remoteCustomers;
+    // SCENARIO 2: Smart Merge
+    // 1. If Remote has it, usage Remote (Server Authority for edits)
+    // 2. If Remote missing it, but Local has it -> Keep Local (It's a new unsynced item) -> Push to Cloud
+    let needsPush = false;
+
+    if (remoteCustomers) {
+        const { merged, hasLocalOnly } = mergeData(appState.customers, remoteCustomers);
+        appState.customers = merged;
+        if (hasLocalOnly) needsPush = true;
     }
 
-    if (remoteTasks && remoteTasks.length > 0) {
-        appState.tasks = remoteTasks;
+    if (remoteTasks) {
+        const { merged, hasLocalOnly } = mergeData(appState.tasks, remoteTasks);
+        appState.tasks = merged;
+        if (hasLocalOnly) needsPush = true;
     }
 
     // Local backup update
     store.save('customers', appState.customers);
     store.save('tasks', appState.tasks);
+
+    // If we found local items that weren't in cloud, sync them up now
+    if (needsPush) {
+        console.log('Found local-only items after merge. Pushing to cloud...');
+        await cloudStore.client.from('customers').upsert(appState.customers);
+        await cloudStore.client.from('tasks').upsert(appState.tasks);
+    }
+}
+
+function mergeData(localItems, remoteItems) {
+    const remoteMap = new Map(remoteItems.map(i => [i.id, i]));
+    const merged = [...remoteItems]; // Start with all remote items
+    let hasLocalOnly = false;
+
+    localItems.forEach(local => {
+        if (!remoteMap.has(local.id)) {
+            // Exists locally but not in remote => Keep it (Offline creation)
+            merged.push(local);
+            hasLocalOnly = true;
+        }
+    });
+
+    return { merged, hasLocalOnly };
 }
 
 // Data Store (LocalStorage & Cloud Wrapper)
