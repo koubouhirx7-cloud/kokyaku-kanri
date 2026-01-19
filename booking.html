@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>予約受付 - HubLink CRM</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-color: #3b82f6;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 24px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            margin: 0 0 16px 0;
+        }
+
+        p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: var(--accent-color);
+            color: white;
+            text-decoration: none;
+            padding: 12px 32px;
+            border-radius: 99px;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">HubLink Cycle</div>
+            <div>Online Reservation</div>
+        </div>
+
+        <div class="card">
+            <h2>来店予約</h2>
+            <p>
+                以下のボタンからGoogleカレンダーの予約ページへ移動し、<br>
+                ご希望の日時を選択してください。<br>
+                メンテナンス、相談などお気軽にどうぞ。
+            </p>
+
+            <!-- ここにお客様のGoogle予約スケジュールURLを設定します -->
+            <a href="#" id="booking-btn" class="btn" target="_blank">予約カレンダーを開く</a>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 HubLink Cycle / CRM System
+        </div>
+    </div>
+
+    <script>
+        // 設定: ここにGoogleカレンダーの予約スケジュールURLを入れてください
+        // 例: 'https://calendar.google.com/calendar/u/0/appointments/schedules/...'
+        const GOOGLE_APPOINTMENT_URL = 'https://calendar.app.google/dhDevmnPRkLKLQQd8';
+
+        const btn = document.getElementById('booking-btn');
+        if (GOOGLE_APPOINTMENT_URL) {
+            btn.href = GOOGLE_APPOINTMENT_URL;
+        } else {
+            btn.onclick = (e) => {
+                e.preventDefault();
+                alert('予約URLがまだ設定されていません。\n店舗管理者にお問い合わせください。');
+            }
+        }
+    </script>
+</body>
+
+</html>
