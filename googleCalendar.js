@@ -143,7 +143,58 @@ const googleCalendar = {
         }, 500);
     },
 
-    // ... (waitForGoogleIdentity, updateStatus, handleAuthClick logic remains)
+    waitForGoogleIdentity() {
+        return new Promise((resolve, reject) => {
+            if (typeof google !== 'undefined' && google.accounts) {
+                resolve();
+                return;
+            }
+            let attempts = 0;
+            const check = setInterval(() => {
+                if (typeof google !== 'undefined' && google.accounts) {
+                    clearInterval(check);
+                    resolve();
+                } else {
+                    attempts++;
+                    if (attempts > 20) {
+                        clearInterval(check);
+                        reject(new Error('Google Identity Services script not loaded'));
+                    }
+                }
+            }, 200);
+        });
+    },
+
+    statusListeners: [],
+    currentStatus: null,
+
+    updateStatus(message, isError = false) {
+        this.currentStatus = { message, isError };
+        console.log(`[GCal Status] ${message}`);
+        this.statusListeners.forEach(cb => cb(message, isError));
+
+        // Also update DOM element if it exists
+        const el = document.getElementById('gcal-status-text');
+        if (el) {
+            el.textContent = message;
+            el.className = isError ? 'text-danger' : 'text-secondary';
+        }
+    },
+
+    handleAuthClick() {
+        console.log('handleAuthClick called');
+        if (!this.tokenClient) {
+            alert('Google APIが初期化されていません。\nステータス: ' + (this.currentStatus?.message || '不明'));
+            console.error('TokenClient is null');
+            return;
+        }
+
+        if (gapi.client.getToken() === null) {
+            this.tokenClient.requestAccessToken({ prompt: 'consent' });
+        } else {
+            this.tokenClient.requestAccessToken({ prompt: '' });
+        }
+    },
 
     handleSignoutClick() {
         const token = gapi.client.getToken();
@@ -233,7 +284,6 @@ const googleCalendar = {
             return null;
         }
     }
-}
 };
 
 // Ensure global scope access
