@@ -622,7 +622,7 @@ window.addOrderRow = () => {
     div.className = 'glass p-8 mb-8 order-item-row moving-gradient-border';
     div.innerHTML = `
         <div class="flex gap-4 items-center mb-4">
-            <input type="text" name="order_name" placeholder="部品名" class="glass-input flex-1" required>
+            <input type="text" name="order_name" placeholder="部品名" class="glass-input flex-1">
             <input type="number" name="order_price" placeholder="金額" class="glass-input" style="width: 80px;">
              <select name="order_status" class="glass-select" style="width: 90px;">
                 <option value="pending">未発注</option>
@@ -652,7 +652,7 @@ window.addWorkRow = () => {
     div.className = 'glass p-8 mb-8 work-item-row moving-gradient-border';
     div.innerHTML = `
         <div class="flex gap-4 items-center mb-4">
-            <input type="text" name="work_content" placeholder="作業内容" class="glass-input flex-1" required>
+            <input type="text" name="work_content" placeholder="作業内容" class="glass-input flex-1">
             <input type="number" name="work_hours" step="0.5" placeholder="時間(h)" class="glass-input" style="width: 80px;">
             <button type="button" class="btn-icon-small" onclick="toggleDetail('detail-${index}')" title="詳細">🔽</button>
             <button type="button" class="btn-icon-small text-danger" onclick="removeRow(this)" title="削除">×</button>
