@@ -465,9 +465,9 @@ function initModal() {
     const closeBtn = document.querySelector('.close-modal');
 
     closeBtn.onclick = () => modal.classList.add('hidden');
-    window.onclick = (e) => {
-        if (e.target === modal) modal.classList.add('hidden');
-    };
+    // window.onclick = (e) => {
+    //     if (e.target === modal) modal.classList.add('hidden');
+    // };
 
     document.getElementById('add-new-btn').onclick = () => {
         if (appState.currentView === 'customers') {
