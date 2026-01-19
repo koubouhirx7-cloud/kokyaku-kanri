@@ -89,6 +89,11 @@
                     <div id="sync-status-indicator" class="sync-status">
                         <span class="status-dot warning"></span> 読み込み中...
                     </div>
+                    <input type="file" id="header-import-file" accept=".json" style="display:none"
+                        onchange="importData(this)">
+                    <button class="btn btn-secondary" onclick="exportData()" title="バックアップファイルを保存">💾 ファイルを保存</button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('header-import-file').click()"
+                        title="バックアップファイルを読み込み">📂 ファイルをロード</button>
                     <button class="btn btn-secondary" onclick="window.open('booking.html', '_blank')"
                         title="予約ページを確認">🔗 予約ページ</button>
                     <button class="btn btn-secondary" onclick="showCustomerEntryQR()" title="QRコードを表示">📲 QR受付</button>
