@@ -119,7 +119,10 @@ function renderTaskDetail(container, taskId) {
         'orders': `
             <div class="draggable-widget glass p-24 h-full" draggable="true" data-id="orders">
                 <div class="widget-header mb-16 flex justify-between items-center cursor-move">
-                    <h3>📦 商品発注 (最大5件)</h3>
+                    <div class="flex items-center gap-8">
+                        <h3>📦 商品発注</h3>
+                        <button class="btn btn-small btn-secondary text-xs" onclick="addDetailRow('order', '${task.id}')">+ 追加</button>
+                    </div>
                     <span class="drag-handle text-secondary">:::</span>
                 </div>
                 <div class="orders-list">
@@ -135,7 +138,10 @@ function renderTaskDetail(container, taskId) {
         'work': `
             <div class="draggable-widget glass p-24 h-full" draggable="true" data-id="work">
                 <div class="widget-header mb-16 flex justify-between items-center cursor-move">
-                    <h3>🛠️ 作業内容 (最大5件)</h3>
+                    <div class="flex items-center gap-8">
+                        <h3>🛠️ 作業内容</h3>
+                        <button class="btn btn-small btn-secondary text-xs" onclick="addDetailRow('work', '${task.id}')">+ 追加</button>
+                    </div>
                     <span class="drag-handle text-secondary">:::</span>
                 </div>
                 <div class="works-list">
@@ -391,6 +397,22 @@ window.handleTaskDetailAttachment = async (event, taskId) => {
         showToast(`${resizedImages.length}枚の画像を追加しました`);
     } catch (e) {
         console.error(e);
-        showToast('画像のアップロードに失敗しました');
     }
+};
+
+window.addDetailRow = (type, taskId) => {
+    const task = appState.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    if (type === 'order') {
+        if (!task.orderItems) task.orderItems = [];
+        task.orderItems.push({ name: '', price: '', status: '' });
+    } else {
+        if (!task.workItems) task.workItems = [];
+        task.workItems.push({ content: '', hours: '', notes: '' });
+    }
+
+    // Save and Re-render
+    store.save('tasks', appState.tasks);
+    renderTaskDetail(document.getElementById('view-container'), taskId);
 };
