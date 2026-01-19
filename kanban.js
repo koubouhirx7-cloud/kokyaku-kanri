@@ -250,7 +250,7 @@ window.showArchiveModal = () => {
 };
 
 window.showAddTaskModal = () => {
-    const customerOptions = appState.customers.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const customerOptions = appState.customers.map(c => `<option value="${c.name}"></option>`).join('');
 
     // Helper for rows
     const generateInputRows = (type) => {
@@ -285,21 +285,12 @@ window.showAddTaskModal = () => {
                 <input type="text" name="title" required placeholder="例: オーバーホール依頼" class="glass-input">
             </div>
             
-            <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
                 <div class="form-group">
-                    <label>関連顧客</label>
-                    <div class="flex gap-8">
-                        <select name="customerId" class="glass-select" id="task-customer-select">
-                            <option value="">顧客を選択...</option>
-                            ${customerOptions}
-                        </select>
-                    </div>
-                    <div class="mt-4">
-                        <label class="text-xs flex items-center gap-4 cursor-pointer">
-                            <input type="checkbox" id="toggle-new-customer" onchange="toggleNewCustomerFields(this)">
-                            新規顧客を入力する
-                        </label>
-                    </div>
+                    <label>関連顧客 (名前を入力または選択)</label>
+                    <input type="text" name="customerInput" list="customer-list" class="glass-input" placeholder="顧客名を入力..." autocomplete="off" oninput="handleCustomerInput(this)">
+                    <datalist id="customer-list">
+                        ${customerOptions}
+                    </datalist>
                 </div>
                 <div class="form-group">
                     <label>期限日</label>
@@ -307,12 +298,9 @@ window.showAddTaskModal = () => {
                 </div>
             </div>
 
-            <!-- New Customer Fields (Hidden by default) -->
+            <!-- New Customer Fields (Hidden by default, shown if input doesn't match existing) -->
             <div id="new-customer-fields" class="glass p-12 mt-8 mb-16 hidden">
-                <div class="form-group mb-8">
-                    <label class="text-xs">お名前</label>
-                    <input type="text" name="new_customer_name" placeholder="顧客名" class="glass-input">
-                </div>
+                <div class="text-xs text-accent mb-8">※新規顧客として登録されます</div>
                 <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                     <div class="form-group">
                         <label class="text-xs">電話番号</label>
@@ -380,28 +368,32 @@ window.showAddTaskModal = () => {
         const formData = new FormData(e.target);
 
         // Handle Customer (New vs Existing)
-        let customerId = formData.get('customerId');
-        let customerName = '未指定';
+        const inputValue = formData.get('customerInput').trim();
+        let customerId = '';
+        let customerName = inputValue;
 
-        const isNewCustomer = document.getElementById('toggle-new-customer').checked;
-        if (isNewCustomer) {
-            const newName = formData.get('new_customer_name');
-            if (newName) {
-                const newCustomer = {
-                    id: Date.now().toString(),
-                    name: newName,
-                    phone: formData.get('new_customer_phone'),
-                    email: formData.get('new_customer_email'),
-                    createdAt: new Date().toISOString()
-                };
-                appState.customers.push(newCustomer);
-                store.save('customers', appState.customers);
-                customerId = newCustomer.id;
-                customerName = newCustomer.name;
-            }
+        // Check if matching existing customer
+        const existingCustomer = appState.customers.find(c => c.name === inputValue);
+
+        if (existingCustomer) {
+            customerId = existingCustomer.id;
+            customerName = existingCustomer.name;
+        } else if (inputValue) {
+            // New Customer
+            const newCustomer = {
+                id: Date.now().toString(),
+                name: inputValue,
+                phone: formData.get('new_customer_phone'),
+                email: formData.get('new_customer_email'),
+                createdAt: new Date().toISOString()
+            };
+            appState.customers.push(newCustomer);
+            store.save('customers', appState.customers);
+            customerId = newCustomer.id;
+            customerName = newCustomer.name;
         } else {
-            const customer = appState.customers.find(c => c.id === customerId);
-            if (customer) customerName = customer.name;
+            alert('顧客名を入力してください');
+            return;
         }
 
         // Collect Order Items
@@ -508,3 +500,20 @@ const kanbanCSS = `
 const kanbanStyleSheet = document.createElement("style");
 kanbanStyleSheet.innerText = kanbanCSS;
 document.head.appendChild(kanbanStyleSheet);
+
+window.handleCustomerInput = (input) => {
+    const val = input.value.trim();
+    const fields = document.getElementById('new-customer-fields');
+    if (!val) {
+        fields.classList.add('hidden');
+        return;
+    }
+
+    // Check if exact match
+    const exists = appState.customers.some(c => c.name === val);
+    if (exists) {
+        fields.classList.add('hidden');
+    } else {
+        fields.classList.remove('hidden');
+    }
+};
