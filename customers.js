@@ -258,7 +258,6 @@ window.editCustomer = (id) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const index = appState.customers.findIndex(c => c.id === id);
-        const index = appState.customers.findIndex(c => c.id === id);
         appState.customers[index] = {
             ...customer,
             ...Object.fromEntries(formData),
@@ -627,17 +626,14 @@ window.showAddMaintenanceForm = (customerId) => {
             id: Date.now().toString(),
             bikeId: formData.get('bikeId'),
             date: formData.get('date'),
-            work: formData.get('work'),
             notes: formData.get('notes')
         });
 
-    });
-
-    customer.updatedAt = new Date().toISOString();
-    store.save('customers', appState.customers);
-    window.viewCustomerDetails(customerId); // Refresh modal
-    setTimeout(() => window.switchDetailTab(document.querySelectorAll('.tab-btn')[1], 'bikes'), 50);
-};
+        customer.updatedAt = new Date().toISOString();
+        store.save('customers', appState.customers);
+        window.viewCustomerDetails(customerId); // Refresh modal
+        setTimeout(() => window.switchDetailTab(document.querySelectorAll('.tab-btn')[1], 'bikes'), 50);
+    };
 };
 
 // Injection of Customer-specific styles
