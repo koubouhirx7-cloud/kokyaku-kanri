@@ -436,9 +436,9 @@ function renderBikeForm(customerId, bike) {
                     <input type="text" name="manufacturerNo" value="${data.manufacturerNo || ''}">
                 </div>
 
-                <div class="form-group form-full" style="background: rgba(239, 68, 68, 0.2); padding: 8px; border-radius: 8px;">
-                     <label style="color: #f87171;">その他コード (未設定)</label>
-                     <input type="text" name="otherCode" value="${data.otherCode || ''}" style="background: rgba(0,0,0,0.3);">
+                <div class="form-group">
+                     <label>その他コード</label>
+                     <input type="text" name="otherCode" value="${data.otherCode || ''}">
                 </div>
 
                 <div class="form-group form-full">
