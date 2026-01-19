@@ -41,8 +41,16 @@ function renderTaskDetail(container, taskId) {
     };
 
     // Load Layout Preference
-    const defaultLayout = ['info', 'memo', 'orders', 'work'];
+    const defaultLayout = ['info', 'memo', 'photos', 'orders', 'work'];
     const layout = appState.detailLayout || defaultLayout;
+
+    // Normalize attachments
+    let images = [];
+    if (task.attachments && Array.isArray(task.attachments)) {
+        images = task.attachments;
+    } else if (task.attachment) {
+        images = [task.attachment];
+    }
 
     // Widget Generators
     const widgets = {
@@ -74,14 +82,6 @@ function renderTaskDetail(container, taskId) {
                          <option value="done" ${task.status === 'done' ? 'selected' : ''}>完了</option>
                     </select>
                 </div>
-                
-                 ${task.attachment ? `
-                <div class="info-group mt-24">
-                    <label class="mb-4 block">📎 添付画像</label>
-                    <div>
-                        <img src="${task.attachment}" style="max-width: 100%; border-radius: 8px; border: 1px solid #555; cursor: pointer;" onclick="openImageZoom('${task.attachment}')">
-                    </div>
-                </div>` : ''}
             </div>
         `,
         'memo': `
@@ -91,6 +91,23 @@ function renderTaskDetail(container, taskId) {
                     <span class="drag-handle text-secondary">:::</span>
                 </div>
                 <textarea id="task-memo-input" class="glass p-20 w-full" style="background: rgba(255,255,255,0.03); border: 1px solid var(--accent); white-space: pre-wrap; font-size: 1.1rem; line-height: 1.6; min-height: 200px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); border-radius: 8px; color: var(--text-main); resize: vertical; outline: none;">${task.memo || ''}</textarea>
+            </div>
+        `,
+        'photos': `
+            <div class="draggable-widget glass p-24 h-full" draggable="true" data-id="photos">
+                <div class="widget-header mb-16 flex justify-between items-center cursor-move">
+                    <h3>📷 添付画像 (${images.length})</h3>
+                    <span class="drag-handle text-secondary">:::</span>
+                </div>
+                ${images.length > 0 ? `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px;">
+                        ${images.map(img => `
+                            <div class="glass flex-center" style="height: 120px; overflow: hidden; cursor: pointer; border: 1px solid rgba(255,255,255,0.1);" onclick="openImageZoom('${img}')">
+                                <img src="${img}" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<p class="text-secondary text-sm">画像はありません</p>'}
             </div>
         `,
         'orders': `
@@ -112,8 +129,8 @@ function renderTaskDetail(container, taskId) {
         'work': `
             <div class="draggable-widget glass p-24 h-full" draggable="true" data-id="work">
                 <div class="widget-header mb-16 flex justify-between items-center cursor-move">
-                     <h3>🛠️ 作業内容 (最大5件)</h3>
-                     <span class="drag-handle text-secondary">:::</span>
+                    <h3>🛠️ 作業内容 (最大5件)</h3>
+                    <span class="drag-handle text-secondary">:::</span>
                 </div>
                 <div class="works-list">
                      <div class="grid-row mb-8 text-secondary text-xs" style="display: grid; grid-template-columns: 3fr 1fr 2fr; gap: 8px;">
@@ -140,12 +157,23 @@ function renderTaskDetail(container, taskId) {
         </div>
 
         <div id="widget-container" class="dashboard-grid mt-24" style="grid-template-columns: repeat(2, 1fr); align-items: start;">
-            ${layout.map(id => widgets[id]).join('')}
+            ${layout.map(id => widgets[id] || '').join('')}
         </div>
     `;
 
+    // Ensure Zoom Modal HTML exists
+    if (!document.getElementById('image-zoom-modal')) {
+        const modalHtml = `
+            <div id="image-zoom-modal" class="image-zoom-modal" onclick="closeImageZoom()">
+                <img id="image-zoom-target" src="" alt="Zoomed Image">
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
     // Drag and Drop Logic
     function initDragAndDrop() {
+        // ... (existing DnD logic) matches previous but ensure it works with new widgets
         const container = document.getElementById('widget-container');
         const draggables = document.querySelectorAll('.draggable-widget');
 
@@ -170,50 +198,6 @@ function renderTaskDetail(container, taskId) {
                 container.insertBefore(draggable, afterElement);
             }
         });
-
-        // Helper to find position
-        function getDragAfterElement(container, y, x) {
-            const draggableElements = [...container.querySelectorAll('.draggable-widget:not(.dragging)')];
-
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                // Simple interaction: based on vertical center if stacking, 
-                // but here we have a grid. Let's rely on standard flow.
-                // Finding the closest element center.
-                const offsetX = x - (box.left + box.width / 2);
-                const offsetY = y - (box.top + box.height / 2);
-                // Logic: We want "closest" in terms of euclidean distance or just flow?
-                // Since it's a grid, "insert before" logic depends on reading order.
-                // If mouse is "before" the center of an element, we insert before it.
-
-                /* Simplified Logic for 2D Grid:
-                   If y is substantially above/below, row matters.
-                   If in same row, x matters.
-                */
-
-                // Let's use simple distance to center point for now, works reasonably well for grids.
-                const distance = Math.hypot(offsetX, offsetY);
-
-                // Wait, standard DnD logic:
-                // "Insert before the element whose center is AFTER the cursor"
-                // If cursor < element_center => offset is negative.
-                // We want the element with the smallest negative offset?? No.
-
-                /* Correct "Insert Before" logic:
-                   The browser handles 'appendChild' vs 'insertBefore'.
-                   We need to find the element that is immediately AFTER the mouse position in DOM order.
-                */
-
-                // Let's try the robust 2D sort approach:
-                if (y < box.top + box.height / 2) {
-                    // Mouse is above bottom half -> candidate for "after"
-                    // Check horizontal?
-                    // Simple: just closest element that is "after" the mouse in reading order?
-                    return closest; // TODO: Refine for grid if janky
-                }
-                return closest;
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
     }
 
     // Better 2D Drag Approach
@@ -222,12 +206,6 @@ function renderTaskDetail(container, taskId) {
 
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect()
-            // Calculate distance between mouse and center of the box
-            const offset = y - box.top - box.height / 2
-            // Also consider X for grid
-            // If we are in the same "row" (y is within box top/bottom), then check x
-
-            // Simplest robust 2D: find element with minimum distance to center
             const dist = Math.hypot(x - (box.left + box.width / 2), y - (box.top + box.height / 2));
 
             if (dist < closest.dist) {
@@ -237,6 +215,9 @@ function renderTaskDetail(container, taskId) {
             }
         }, { dist: Number.POSITIVE_INFINITY }).element
     }
+
+    // Initialize DnD
+    initDragAndDrop();
 
     function saveLayoutOrder() {
         const container = document.getElementById('widget-container');
@@ -249,11 +230,10 @@ function renderTaskDetail(container, taskId) {
         appState.detailLayout = null;
         store.save('detail_layout', null);
         // Reload current view
-        const currentTaskId = document.querySelector('.view-actions button[onclick^="saveTaskDetail"]').getAttribute('onclick').match(/'(.+)'/)[1];
+        const currentTaskId = task.id; // Corrected to use closure var
         renderTaskDetail(document.getElementById('view-container'), currentTaskId);
     };
 
-    // Styles for Task Detail
     const taskDetailStyle = `
 .draggable-widget { 
     transition: transform 0.2s, box-shadow 0.2s; 
@@ -304,11 +284,31 @@ function renderTaskDetail(container, taskId) {
 .breadcrumb.link { cursor: pointer; }
 .breadcrumb.link:hover { color: var(--accent-light); }
 `;
-
-    const detailStyleSheet = document.createElement("style");
-    detailStyleSheet.innerText = taskDetailStyle;
-    document.head.appendChild(detailStyleSheet);
+    // Removed duplicate style injection to prevent bloat on re-renders, or keep simple check
+    if (!document.getElementById('task-detail-styles')) {
+        const detailStyleSheet = document.createElement("style");
+        detailStyleSheet.id = 'task-detail-styles';
+        detailStyleSheet.innerText = taskDetailStyle;
+        document.head.appendChild(detailStyleSheet);
+    }
 }
+
+// Logic for Image Zoom
+window.openImageZoom = (src) => {
+    const modal = document.getElementById('image-zoom-modal');
+    const img = document.getElementById('image-zoom-target');
+    if (modal && img) {
+        img.src = src;
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeImageZoom = () => {
+    const modal = document.getElementById('image-zoom-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
 
 // Also include the missing update function
 window.updateTaskStatusInDetail = (taskId, newStatus) => {
