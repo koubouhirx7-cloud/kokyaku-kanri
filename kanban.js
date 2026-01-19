@@ -563,22 +563,27 @@ window.handleCustomerInput = (input) => {
 // Temporary storage for images
 let currentTaskImages = [];
 
-window.handleTaskImageUpload = (input) => {
+window.handleTaskImageUpload = async (input) => {
     if (!input.files || input.files.length === 0) return;
 
-    // Convert FileList to Array
     const files = Array.from(input.files);
 
-    // Process each file
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-            currentTaskImages.push(base64);
-            updateImagePreview();
-        };
-        reader.readAsDataURL(file);
-    });
+    // Show loading state if needed, or just process async
+    // Since this is inside key handler, we should wait or update UI after
+
+    try {
+        const compressionPromises = files.map(file => window.resizeImage(file));
+        const compressedImages = await Promise.all(compressionPromises);
+
+        currentTaskImages = [...currentTaskImages, ...compressedImages];
+        updateImagePreview();
+
+        // Notify user of size reduction (Optional but good for confirmation)
+        console.log(`Compressed ${files.length} images.`);
+    } catch (e) {
+        console.error('Image compression failed:', e);
+        alert('画像の圧縮に失敗しました。');
+    }
 };
 
 window.removeImage = (index) => {

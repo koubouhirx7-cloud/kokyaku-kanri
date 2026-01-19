@@ -80,12 +80,20 @@ const store = {
     async save(key, data) {
         // Save to LocalStorage
         try {
-            localStorage.setItem(`crm_${key}`, JSON.stringify(data));
+            const json = JSON.stringify(data);
+            localStorage.setItem(`crm_${key}`, json);
+
+            // Usage Check (Log if > 4MB)
+            if (json.length > 4000000) {
+                console.warn(`Warning: Data size for ${key} is large (${(json.length / 1024 / 1024).toFixed(2)} MB). Near LocalStorage limit.`);
+            }
         } catch (e) {
             console.error('LocalStorage Save Error:', e);
-            if (e.name === 'QuotaExceededError') {
-                alert('保存容量が一杯です。画像の枚数を減らすか、不要なデータを削除してください。');
+            if (e.name === 'QuotaExceededError' || e.code === 22) {
+                alert('【重要】データの保存容量が限界に達しました！\nこれ以上データを保存できません。\n\n・不要な画像を削除してください\n・「設定」からデータをバックアップ(書き出し)してください\n\n※このままリロードすると、今行った変更は失われます。');
                 return;
+            } else {
+                alert('データの保存中にエラーが発生しました: ' + e.message);
             }
         }
 
@@ -133,13 +141,13 @@ async function syncDataFromCloud() {
     const lastSyncTime = lastSyncStr ? parseInt(lastSyncStr) : 0;
 
     // SCENARIO 1: Cloud is empty, Local has data -> Push Local to Cloud
-    // ONLY if we have never synced before (lastSyncTime === 0)
-    // Otherwise, empty cloud might mean "everything was deleted on another device"
-    if ((!remoteCustomers || remoteCustomers.length === 0) && appState.customers.length > 0 && lastSyncTime === 0) {
-        console.log('Cloud is empty & First Sync. Pushing local data to cloud...');
+    // If the cloud is empty but we have local data, assume cloud was reset or we are restoring.
+    // We prioritize Local Data safety over "Sync Deletion".
+    if ((!remoteCustomers || remoteCustomers.length === 0) && appState.customers.length > 0) {
+        console.log('Cloud is empty. Pushing local data to cloud (Restore Mode)...');
         await cloudStore.pushLocalToCloud(appState.customers, appState.tasks);
         localStorage.setItem('crm_last_sync', Date.now().toString());
-        return;
+        // Do not return, continue to ensure state is consistent
     }
 
     // SCENARIO 2: Smart Merge with Timestamp Truth
@@ -167,8 +175,19 @@ async function syncDataFromCloud() {
     // Sync local-only items
     if (needsPush) {
         console.log('Found new local items. Pushing to cloud...');
-        await cloudStore.client.from('customers').upsert(appState.customers);
-        await cloudStore.client.from('tasks').upsert(appState.tasks);
+        try {
+            const { error: cErr } = await cloudStore.client.from('customers').upsert(appState.customers);
+            if (cErr) throw cErr;
+
+            const { error: tErr } = await cloudStore.client.from('tasks').upsert(appState.tasks);
+            if (tErr) throw tErr;
+
+            console.log('Cloud sync successful.');
+        } catch (e) {
+            console.error('Cloud Sync Failed:', e);
+            // Non-blocking alert, or just log
+            alert('【注意】クラウドへの保存に失敗しました。インターネット接続を確認してください。\nデータは端末に保存されています。');
+        }
     }
 }
 
@@ -186,21 +205,10 @@ function mergeData(localItems, remoteItems, lastSyncTime) {
     localItems.forEach(local => {
         if (!remoteMap.has(local.id)) {
             // Item exists locally but NOT in remote
-
-            // Parse CreatedAt (Default to 0 if missing)
-            const createdAt = local.createdAt ? new Date(local.createdAt).getTime() : 0;
-
-            if (createdAt > lastSyncTime) {
-                // CASE A: Created AFTER last sync => New Offline Item => Keep & Push
-                merged.push(local);
-                hasLocalOnly = true;
-            } else {
-                // CASE B: Created BEFORE last sync => Old Item
-                // If it was valid, it SHOULD have been in remote.
-                // Since it's not in remote, it must have been DELETED remotely.
-                // Action: Drop it (Do not add to merged)
-                console.log(`Dropping zombie item (Deleted remotely): ${local.id} (${local.title || local.name})`);
-            }
+            // Prevent data loss: Assume it's a new or unsynced local item
+            merged.push(local);
+            hasLocalOnly = true;
+            console.log(`Preserving local-only item: ${local.id} (${local.title || local.name})`);
         }
     });
 
@@ -266,42 +274,15 @@ if (!appState.kanbanColumns || appState.kanbanColumns.length === 0) {
     store.save('kanban_columns', appState.kanbanColumns);
 }
 
-// Ensure default data matches new structure if empty
-if (appState.customers.length === 0 && appState.tasks.length === 0) {
-    appState.customers = [
-        {
-            id: '1',
-            name: '山田 太郎',
-            email: 'yamada@example.com',
-            phone: '090-1234-5678',
-            lineId: 'yamada_taro_official',
-            notes: '重要顧客',
-            bikes: [
-                { id: 'b1', model: 'Skyline V2', frameNo: 'SN12345', purchaseDate: '2025-05-20' }
-            ],
-            maintenanceLogs: [
-                { id: 'm1', date: '2025-12-01', work: 'ブレーキ調整', notes: '摩耗していたため再調整。次回交換推奨。' }
-            ],
-            createdAt: new Date().toISOString()
-        },
-        {
-            id: '2',
-            name: '佐藤 花子',
-            email: 'sato@example.com',
-            phone: '080-9876-5432',
-            notes: '',
-            bikes: [],
-            maintenanceLogs: [],
-            createdAt: new Date().toISOString()
-        }
-    ];
-    appState.tasks = [
-        { id: 't1', title: '見積書作成', customerId: '1', customerName: '山田 太郎', status: 'todo', priority: 'high', dueDate: '2026-01-20' },
-        { id: 't2', title: '初回ヒアリング', customerId: '2', customerName: '佐藤 花子', status: 'inprogress', priority: 'medium', dueDate: '2026-01-15' }
-    ];
-    store.save('customers', appState.customers);
-    store.save('tasks', appState.tasks);
+// Ensure kanban columns exist
+if (!appState.kanbanColumns || appState.kanbanColumns.length === 0) {
+    appState.kanbanColumns = defaultColumns;
+    store.save('kanban_columns', appState.kanbanColumns);
 }
+
+// REMOVED: Default Sample Data Injection
+// This was causing issues where wiping data would force-reload samples, or overwriting empty states.
+// appState.customers and appState.tasks will remain empty if storage is empty.
 
 // Navigation
 function initNavigation() {
@@ -317,6 +298,10 @@ function initNavigation() {
         });
     });
 }
+
+const VIEW_MAPPING = {
+    'taskDetail': 'kanban'
+};
 
 function navigateTo(view, param) {
     const container = document.getElementById('view-container');
@@ -334,6 +319,23 @@ function navigateTo(view, param) {
     container.classList.remove('fade-in');
     void container.offsetWidth; // Force reflow
     container.classList.add('fade-in');
+
+    // Update Navigation UI
+    const navItems = document.querySelectorAll('nav li');
+
+    // Explicit Mapping for Sidebar Highlighting
+    let targetSidebarView = view;
+    if (view === 'taskDetail') {
+        targetSidebarView = 'kanban';
+    }
+
+    navItems.forEach(item => {
+        if (item.getAttribute('data-view') === targetSidebarView) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
 
     switch (view) {
         case 'dashboard':
@@ -660,6 +662,46 @@ window.saveGoogleConfig = () => {
     localStorage.setItem('crm_google_api_key', key);
     alert('設定を保存しました。システムをリロードします。');
     location.reload();
+};
+
+
+
+// Global Image Compression Utility
+window.resizeImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                // Return compressed base64
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 };
 
 window.showToast = (message) => {
